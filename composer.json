@@ -1,0 +1,28 @@
+{
+  "name": "payroad/payment-core",
+  "description": "Payment domain core — aggregates, ports, and application use cases for Payroad",
+  "type": "library",
+  "license": "MIT",
+  "homepage": "https://github.com/payroad/payment-core",
+  "support": {
+    "source": "https://github.com/payroad/payment-core",
+    "issues": "https://github.com/payroad/payment-core/issues"
+  },
+  "require": {
+    "php": "^8.2",
+    "ramsey/uuid": "^4.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Payroad\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.0"
+  }
+}
