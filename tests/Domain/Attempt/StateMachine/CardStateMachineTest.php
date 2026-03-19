@@ -2,18 +2,17 @@
 
 namespace Tests\Domain\Attempt\StateMachine;
 
+use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStatus;
-use Payroad\Domain\Attempt\PaymentAttempt;
-use Payroad\Domain\Attempt\StateMachine\CardStateMachine;
-use Payroad\Domain\Exception\InvalidTransitionException;
+use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
+use Payroad\Domain\PaymentFlow\Card\CardStateMachine;
+use Payroad\Domain\Attempt\Exception\InvalidTransitionException;
 use Payroad\Domain\Money\Currency;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\CustomerId;
-use Payroad\Domain\Payment\IdempotencyKey;
-use Payroad\Domain\Payment\MerchantId;
 use Payroad\Domain\Payment\Payment;
+use Payroad\Domain\Payment\PaymentId;
 use Payroad\Domain\Payment\PaymentMetadata;
-use Payroad\Domain\Payment\PaymentMethodType;
 use Tests\Stub\StubSpecificData;
 use PHPUnit\Framework\TestCase;
 
@@ -26,149 +25,104 @@ final class CardStateMachineTest extends TestCase
         $this->sm = new CardStateMachine();
     }
 
-    private function makeAttemptInStatus(AttemptStatus $status): PaymentAttempt
+    private function makeAttempt(): CardPaymentAttempt
     {
         $payment = Payment::create(
-            Money::ofMinor(1000, Currency::of('USD')),
-            MerchantId::of('merchant-1'),
+            PaymentId::generate(),
+            Money::ofMinor(1000, new Currency('USD', 2)),
             CustomerId::of('customer-1'),
-            IdempotencyKey::of('idem-key-' . uniqid()),
             new PaymentMetadata()
         );
 
-        $attempt = PaymentAttempt::create(
-            $payment->getId(),
-            PaymentMethodType::CARD,
-            'stub',
-            new StubSpecificData()
-        );
-
-        // Transition the attempt to the desired starting status
-        $this->advanceAttemptTo($attempt, $status);
-
-        return $attempt;
-    }
-
-    private function advanceAttemptTo(PaymentAttempt $attempt, AttemptStatus $target): void
-    {
-        if ($target === AttemptStatus::PENDING) {
-            return;
-        }
-
-        // Map target to a reachable path for card state machine
-        $paths = [
-            AttemptStatus::AWAITING_CONFIRMATION->value => [AttemptStatus::AWAITING_CONFIRMATION],
-            AttemptStatus::PROCESSING->value            => [AttemptStatus::PROCESSING],
-            AttemptStatus::FAILED->value                => [AttemptStatus::FAILED],
-            AttemptStatus::SUCCEEDED->value             => [AttemptStatus::PROCESSING, AttemptStatus::SUCCEEDED],
-            AttemptStatus::CANCELED->value              => [AttemptStatus::AWAITING_CONFIRMATION, AttemptStatus::CANCELED],
-        ];
-
-        if (isset($paths[$target->value])) {
-            foreach ($paths[$target->value] as $step) {
-                $attempt->transitionTo($step, $step->value);
-            }
-        }
+        return CardPaymentAttempt::create(PaymentAttemptId::generate(), $payment->getId(), 'stub', new StubSpecificData());
     }
 
     // ── PENDING transitions ───────────────────────────────────────────────────
 
     public function testPendingToAwaitingConfirmationIsAllowed(): void
     {
-        $attempt = $this->makeAttemptInStatus(AttemptStatus::PENDING);
-        $this->assertTrue($this->sm->canTransition($attempt, AttemptStatus::AWAITING_CONFIRMATION));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::AWAITING_CONFIRMATION));
     }
 
     public function testPendingToProcessingIsAllowed(): void
     {
-        $attempt = $this->makeAttemptInStatus(AttemptStatus::PENDING);
-        $this->assertTrue($this->sm->canTransition($attempt, AttemptStatus::PROCESSING));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::PROCESSING));
     }
 
     public function testPendingToFailedIsAllowed(): void
     {
-        $attempt = $this->makeAttemptInStatus(AttemptStatus::PENDING);
-        $this->assertTrue($this->sm->canTransition($attempt, AttemptStatus::FAILED));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::FAILED));
     }
 
     public function testPendingToSucceededIsNotAllowed(): void
     {
-        $attempt = $this->makeAttemptInStatus(AttemptStatus::PENDING);
-        $this->assertFalse($this->sm->canTransition($attempt, AttemptStatus::SUCCEEDED));
+        $this->assertFalse($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::SUCCEEDED));
     }
 
     // ── AWAITING_CONFIRMATION transitions ────────────────────────────────────
 
     public function testAwaitingConfirmationToProcessingIsAllowed(): void
     {
-        $attempt = $this->makeAttemptInStatus(AttemptStatus::AWAITING_CONFIRMATION);
-        $this->assertTrue($this->sm->canTransition($attempt, AttemptStatus::PROCESSING));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::AWAITING_CONFIRMATION, AttemptStatus::PROCESSING));
     }
 
     public function testAwaitingConfirmationToFailedIsAllowed(): void
     {
-        $attempt = $this->makeAttemptInStatus(AttemptStatus::AWAITING_CONFIRMATION);
-        $this->assertTrue($this->sm->canTransition($attempt, AttemptStatus::FAILED));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::AWAITING_CONFIRMATION, AttemptStatus::FAILED));
     }
 
     public function testAwaitingConfirmationToCanceledIsAllowed(): void
     {
-        $attempt = $this->makeAttemptInStatus(AttemptStatus::AWAITING_CONFIRMATION);
-        $this->assertTrue($this->sm->canTransition($attempt, AttemptStatus::CANCELED));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::AWAITING_CONFIRMATION, AttemptStatus::CANCELED));
     }
 
     public function testAwaitingConfirmationToSucceededIsNotAllowed(): void
     {
-        $attempt = $this->makeAttemptInStatus(AttemptStatus::AWAITING_CONFIRMATION);
-        $this->assertFalse($this->sm->canTransition($attempt, AttemptStatus::SUCCEEDED));
+        $this->assertFalse($this->sm->canTransition(AttemptStatus::AWAITING_CONFIRMATION, AttemptStatus::SUCCEEDED));
     }
 
     // ── PROCESSING transitions ────────────────────────────────────────────────
 
     public function testProcessingToSucceededIsAllowed(): void
     {
-        $attempt = $this->makeAttemptInStatus(AttemptStatus::PROCESSING);
-        $this->assertTrue($this->sm->canTransition($attempt, AttemptStatus::SUCCEEDED));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::PROCESSING, AttemptStatus::SUCCEEDED));
     }
 
     public function testProcessingToFailedIsAllowed(): void
     {
-        $attempt = $this->makeAttemptInStatus(AttemptStatus::PROCESSING);
-        $this->assertTrue($this->sm->canTransition($attempt, AttemptStatus::FAILED));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::PROCESSING, AttemptStatus::FAILED));
     }
 
     public function testProcessingToCanceledIsNotAllowed(): void
     {
-        $attempt = $this->makeAttemptInStatus(AttemptStatus::PROCESSING);
-        $this->assertFalse($this->sm->canTransition($attempt, AttemptStatus::CANCELED));
+        $this->assertFalse($this->sm->canTransition(AttemptStatus::PROCESSING, AttemptStatus::CANCELED));
     }
 
     // ── Terminal status transitions ───────────────────────────────────────────
 
     public function testSucceededToFailedIsNotAllowed(): void
     {
-        $attempt = $this->makeAttemptInStatus(AttemptStatus::SUCCEEDED);
-        $this->assertFalse($this->sm->canTransition($attempt, AttemptStatus::FAILED));
+        $this->assertFalse($this->sm->canTransition(AttemptStatus::SUCCEEDED, AttemptStatus::FAILED));
     }
 
-    // ── applyTransition ───────────────────────────────────────────────────────
+    // ── applyTransition on the attempt ───────────────────────────────────────
 
-    public function testApplyTransitionCallsTransitionToOnAttempt(): void
+    public function testApplyTransitionOnAttemptAppliesValidTransition(): void
     {
-        $attempt = $this->makeAttemptInStatus(AttemptStatus::PENDING);
+        $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $this->sm->applyTransition($attempt, AttemptStatus::PROCESSING, 'processing');
+        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
 
         $this->assertSame(AttemptStatus::PROCESSING, $attempt->getStatus());
         $this->assertSame('processing', $attempt->getProviderStatus());
     }
 
-    public function testApplyTransitionThrowsInvalidTransitionExceptionOnInvalidTransition(): void
+    public function testApplyTransitionOnAttemptThrowsOnInvalidTransition(): void
     {
-        $attempt = $this->makeAttemptInStatus(AttemptStatus::PENDING);
+        $attempt = $this->makeAttempt();
 
         $this->expectException(InvalidTransitionException::class);
-        $this->sm->applyTransition($attempt, AttemptStatus::SUCCEEDED, 'succeeded');
+        $attempt->applyTransition(AttemptStatus::SUCCEEDED, 'succeeded');
     }
 }

@@ -6,21 +6,28 @@ use Ramsey\Uuid\Uuid;
 
 final readonly class PaymentId
 {
-    public function __construct(public readonly string $value)
+    private function __construct(public readonly string $value) {}
+
+    public static function fromUuid(string $uuid): self
     {
-        if (!Uuid::isValid($value)) {
-            throw new \InvalidArgumentException("Invalid PaymentId: \"{$value}\".");
+        if (!Uuid::isValid($uuid)) {
+            throw new \InvalidArgumentException("Invalid UUID for PaymentId: \"{$uuid}\".");
         }
+        return new self($uuid);
     }
 
+    public static function fromInt(int $id): self
+    {
+        if ($id <= 0) {
+            throw new \InvalidArgumentException("PaymentId int value must be positive, got {$id}.");
+        }
+        return new self((string) $id);
+    }
+
+    /** Convenience method for UUID-based workflows. */
     public static function generate(): self
     {
-        return new self(Uuid::uuid4()->toString());
-    }
-
-    public static function fromString(string $value): self
-    {
-        return new self($value);
+        return self::fromUuid(Uuid::uuid4()->toString());
     }
 
     public function equals(self $other): bool

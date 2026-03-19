@@ -1,288 +1,317 @@
-# zykovnick/payment-core
+# payroad-core
 
-[![GitHub](https://img.shields.io/badge/github-zykovnick%2Fpayment--core-blue?logo=github)](https://github.com/zykovnick/payment-core)
+<p>
+  <a href="https://github.com/payroad/payroad-core/actions"><img src="https://github.com/payroad/payroad-core/workflows/Tests/badge.svg" alt="Tests"></a>
+  <a href="https://packagist.org/packages/payroad/payroad-core"><img src="https://img.shields.io/packagist/v/payroad/payroad-core" alt="Latest Version"></a>
+  <a href="https://packagist.org/packages/payroad/payroad-core"><img src="https://img.shields.io/packagist/php-v/payroad/payroad-core" alt="PHP Version"></a>
+  <a href="https://github.com/payroad/payroad-core/blob/main/LICENSE"><img src="https://img.shields.io/github/license/payroad/payroad-core" alt="License"></a>
+</p>
 
-Framework-independent domain core for the Payroad payment gateway.
-Built on Domain-Driven Design and Hexagonal Architecture.
-
----
-
-## What this package is
-
-`payment-core` is the **shared kernel** of the Payroad ecosystem. It contains:
-
-- Domain aggregates with no framework or database dependencies
-- Port interfaces that integration packages and the gateway implement
-- Application use cases that orchestrate the domain
-
-It knows **nothing** about Stripe, databases, HTTP, or any specific provider.
+Framework-agnostic payment domain for the Payroad ecosystem — aggregates, use cases, and provider ports with no framework or database dependencies.
 
 ---
 
-## Package ecosystem
+## Installation
 
+```bash
+composer require payroad/payroad-core
 ```
-zykovnick/payment-core       ← this package
-paylet/payment-stripe        → implements PaymentProviderInterface for Stripe
-paylet/payment-nowpayments   → implements PaymentProviderInterface for crypto
-paylet/payment-p2p           → implements PaymentProviderInterface for P2P
-paylet-gateway               → PHP application, wires everything together
-```
+
+Requires PHP 8.2+.
 
 ---
 
-## Architecture
+## Overview
 
-### Two aggregates
-
-**`Payment`** — thin business document. Represents the merchant's intent to collect money.
-Holds: amount, merchant, customer, idempotency key, metadata, expiry, derived status.
-Does **not** contain attempts.
-
-**`PaymentAttempt`** — main operational aggregate. Represents one execution attempt via a specific provider.
-Holds: method type, provider type, provider reference, universal status, raw provider status, specific data.
+`payroad-core` is the shared kernel of the Payroad payment platform. It defines the domain model and the contracts (ports) that infrastructure must implement.
 
 ```
-Payment ←──────────── PaymentAttempt
-  id                    id
-  amount                paymentId  (FK only, not a reference)
-  status                status     (AttemptStatus — 7 universal states)
-  successfulAttemptId   providerStatus  (raw: "requires_capture", "confirming"…)
-                        specificData    (interface — impl lives in provider package)
+┌──────────────────────────────────┐
+│         Your Application         │
+│   (Symfony / Laravel / custom)   │
+└────────────────┬─────────────────┘
+                 │ uses
+┌────────────────▼─────────────────┐
+│           payroad-core           │
+│  Domain · Use Cases · Ports      │
+└───────┬──────────────┬───────────┘
+        │ implements   │ implements
+┌───────▼──────┐ ┌─────▼────────────┐
+│   Provider   │ │  Infrastructure  │
+│ stripe, etc. │ │  DB, Events, …   │
+└──────────────┘ └──────────────────┘
 ```
 
-### Dual status on PaymentAttempt
-
-```
-AttemptStatus    business-level state — 7 universal values
-providerStatus   raw provider state   — "requires_capture", "waiting", "confirming"…
-```
-
-State machines operate on `providerStatus` inside integration packages and map to `AttemptStatus`.
-`Payment` reacts only to `AttemptStatus` via domain events.
-
-### State machines (by method type, not provider)
-
-Four state machines live in this package, one per payment method:
-
-```
-CardStateMachine
-  PENDING ──► AWAITING_CONFIRMATION ──► PROCESSING ──► SUCCEEDED
-          └──► PROCESSING            └──► FAILED
-          └──► FAILED                └──► CANCELED
-
-CryptoStateMachine
-  PENDING ──► PROCESSING ──► SUCCEEDED
-                         └──► FAILED
-                         └──► EXPIRED
-
-P2PStateMachine
-  PENDING ──► AWAITING_CONFIRMATION ──► PROCESSING ──► SUCCEEDED
-          └──► FAILED               └──► FAILED
-                                    └──► EXPIRED
-
-CashStateMachine
-  PENDING ──► AWAITING_CONFIRMATION ──► SUCCEEDED
-          └──► FAILED               └──► EXPIRED
-```
-
-Provider-specific sub-flows (e.g. Stripe's `requires_capture`) are handled inside the integration package before mapping to these universal states.
+This package contains **no** HTTP, ORM, or provider-specific code.
 
 ---
 
-## Directory structure
+## Payment flows
 
+Four payment methods are supported, each with its own aggregate, state machine, and refund flow:
+
+| Flow | Attempt class | Key steps |
+|------|--------------|-----------|
+| **Card** | `CardPaymentAttempt` | Authorize → (3DS) → Capture / Void |
+| **Crypto** | `CryptoPaymentAttempt` | Address issued → Confirmations → Settled |
+| **P2P** | `P2PPaymentAttempt` | QR / redirect → User confirms → Settled |
+| **Cash** | `CashPaymentAttempt` | Voucher issued → Cash collected → Settled |
+
+---
+
+## Usage
+
+### Create a payment
+
+```php
+use Payroad\Application\UseCase\Payment\CreatePaymentCommand;
+use Payroad\Domain\Money\Currency;
+use Payroad\Domain\Money\Money;
+use Payroad\Domain\Payment\CustomerId;
+use Payroad\Domain\Payment\PaymentMetadata;
+
+$command = new CreatePaymentCommand(
+    amount:    Money::ofDecimal('49.99', new Currency('USD', 2)),
+    customerId: CustomerId::of('customer-456'),
+    metadata:  PaymentMetadata::fromArray(['orderId' => '789']),
+    expiresAt: new DateTimeImmutable('+30 minutes'),
+);
+
+$useCase->execute($command);
 ```
-src/
-├── Domain/
-│   ├── Money/
-│   │   ├── Currency.php            ISO 4217, format-validated value object
-│   │   └── Money.php               Integer minor units, bcmath arithmetic
-│   ├── Payment/
-│   │   ├── Payment.php             Thin aggregate
-│   │   ├── PaymentId.php
-│   │   ├── PaymentStatus.php       PENDING|PROCESSING|SUCCEEDED|FAILED|CANCELED|EXPIRED
-│   │   ├── IdempotencyKey.php
-│   │   ├── MerchantId.php
-│   │   ├── CustomerId.php
-│   │   ├── PaymentMetadata.php     Immutable key-value merchant metadata
-│   │   └── PaymentMethodType.php   CARD|CRYPTO|P2P|CASH
-│   ├── Attempt/
-│   │   ├── PaymentAttempt.php      Operational aggregate
-│   │   ├── AttemptId.php
-│   │   ├── AttemptStatus.php
-│   │   └── StateMachine/
-│   │       ├── AttemptStateMachineInterface.php
-│   │       ├── CardStateMachine.php
-│   │       ├── CryptoStateMachine.php
-│   │       ├── P2PStateMachine.php
-│   │       └── CashStateMachine.php
-│   ├── Flow/
-│   │   └── PaymentSpecificData.php  Interface only — impls live in provider packages
-│   ├── Event/
-│   │   ├── DomainEvent.php
-│   │   ├── Payment/                 PaymentCreated|Succeeded|Failed|Canceled|Expired
-│   │   └── Attempt/                 AttemptInitiated|StatusChanged|Succeeded|Failed
-│   └── Exception/
-│       └── InvalidTransitionException.php
-├── Port/
-│   ├── PaymentRepositoryInterface.php
-│   ├── PaymentAttemptRepositoryInterface.php  (includes findByProviderReference)
-│   ├── PaymentProviderInterface.php
-│   ├── ProviderRegistryInterface.php
-│   ├── StateMachineRegistryInterface.php
-│   ├── DomainEventDispatcherInterface.php
-│   └── WebhookResult.php            DTO returned by parseWebhook()
-└── Application/
-    ├── UseCase/
-    │   ├── CreatePayment/           Idempotent payment creation
-    │   ├── InitiateAttempt/         Expiry check + provider initiation
-    │   └── HandleWebhook/           Parse → transition → propagate to Payment
-    └── Exception/
-        ├── PaymentNotFoundException.php
-        ├── AttemptNotFoundException.php
-        ├── DuplicatePaymentException.php
-        └── ProviderNotFoundException.php
+
+Supply your own ID when needed (e.g. client-generated UUID):
+
+```php
+use Payroad\Domain\Payment\PaymentId;
+
+$command = new CreatePaymentCommand(
+    // ...
+    id: PaymentId::fromUuid('018e4c3d-1a2b-7000-...'),
+);
+```
+
+### Initiate a card attempt
+
+```php
+use Payroad\Application\UseCase\Card\InitiateCardAttemptCommand;
+use Payroad\Port\Provider\Card\CardAttemptContext;
+
+$command = new InitiateCardAttemptCommand(
+    paymentId:    $payment->getId(),
+    providerName: 'stripe',
+    context:      new CardAttemptContext(ip: '1.2.3.4', userAgent: '...'),
+);
+
+$useCase->execute($command);
+```
+
+### Capture / void an authorized card
+
+```php
+use Payroad\Application\UseCase\Card\CaptureCardAttemptCommand;
+use Payroad\Application\UseCase\Card\VoidCardAttemptCommand;
+
+// Full capture
+$captureUseCase->execute(new CaptureCardAttemptCommand($attempt->getId()));
+
+// Partial capture
+$captureUseCase->execute(new CaptureCardAttemptCommand(
+    $attempt->getId(),
+    Money::ofDecimal('25.00', new Currency('USD', 2)),
+));
+
+// Void (release the authorization)
+$voidUseCase->execute(new VoidCardAttemptCommand($attempt->getId()));
+```
+
+### Handle an incoming webhook
+
+```php
+use Payroad\Application\UseCase\Webhook\HandleWebhookCommand;
+
+$useCase->execute(new HandleWebhookCommand(
+    providerName: 'stripe',
+    payload:      $request->toArray(),
+    headers:      $request->headers->all(),
+));
+```
+
+The use case is idempotent — duplicate webhooks from at-least-once providers are safely ignored.
+
+### Cancel or expire a payment
+
+```php
+use Payroad\Application\UseCase\Payment\CancelPaymentCommand;
+use Payroad\Application\UseCase\Payment\ExpirePaymentCommand;
+
+$cancelUseCase->execute(new CancelPaymentCommand($payment->getId()));
+$expireUseCase->execute(new ExpirePaymentCommand($payment->getId()));
 ```
 
 ---
 
 ## Key design decisions
 
-**`Money` uses integer minor units + bcmath**
-`(int)(1.15 * 100) === 114` in PHP. All monetary values are stored as integers (cents, pence) and constructed from decimal strings via `bcmath` to avoid float errors.
+### Payment and PaymentAttempt are separate aggregates
 
-**`PaymentSpecificData` is an interface, not a class**
-`CardSpecificData`, `CryptoSpecificData`, etc. live in their respective integration packages. Adding a new provider requires no changes to this package.
+`Payment` is a thin business document — amount, customer, status. It never holds attempt objects, only the ID of the winning attempt once resolved.
 
-**`PaymentAttempt::transitionTo()` is the single status-change point**
-Status can only change via `transitionTo()`, which is called exclusively by `AttemptStateMachineInterface` implementations. Direct status mutation from outside is not possible.
+`PaymentAttempt` is the operational aggregate that drives actual money movement through a provider. Multiple attempts may exist per payment (retries).
 
-**`WebhookResult` decouples providers from aggregates**
-`PaymentProviderInterface::parseWebhook()` returns a `WebhookResult` DTO. The provider never touches the aggregate directly — `HandleWebhookUseCase` applies the result.
-
-**`version` field on both aggregates**
-Optimistic locking support. Implementations of `PaymentRepositoryInterface` and `PaymentAttemptRepositoryInterface` are expected to enforce version checks on save.
-
-**Idempotency at domain level**
-`Payment` is keyed by `IdempotencyKey`. `CreatePaymentUseCase` checks for an existing payment before creating a new one. The database layer must additionally enforce a `UNIQUE` constraint.
-
----
-
-## Usage example
-
-### Creating a payment
+### Money carries precision explicitly
 
 ```php
-use Payroad\Application\UseCase\CreatePayment\CreatePaymentCommand;
-use Payroad\Application\UseCase\CreatePayment\CreatePaymentUseCase;
-use Payroad\Domain\Money\Currency;
-use Payroad\Domain\Money\Money;
-use Payroad\Domain\Payment\CustomerId;
-use Payroad\Domain\Payment\IdempotencyKey;
-use Payroad\Domain\Payment\MerchantId;
-use Payroad\Domain\Payment\PaymentMetadata;
+// Fiat — precision from ISO 4217, provided by infrastructure KnownCurrencies
+new Currency('USD', 2)   // 1 USD = 100 cents
+new Currency('JPY', 0)   // 1 JPY, no subunits
+new Currency('KWD', 3)   // 1 KWD = 1000 fils
 
-$command = new CreatePaymentCommand(
-    amount:         Money::ofDecimal('99.99', Currency::of('USD')),
-    merchantId:     MerchantId::of('merchant-123'),
-    customerId:     CustomerId::of('customer-456'),
-    idempotencyKey: IdempotencyKey::of('order-789'),
-    metadata:       PaymentMetadata::fromArray(['orderId' => '789']),
-    expiresAt:      new DateTimeImmutable('+30 minutes'),
-);
+// Crypto — precision always explicit
+new Currency('BTC',  8)  // 1 BTC = 100_000_000 satoshis
+new Currency('USDT', 6)  // 1 USDT = 1_000_000 micro-USDT
+new Currency('ETH',  18) // ⚠ int overflow above ~9.2 ETH — use ofDecimal()
 
-$payment = $useCase->execute($command);
+Money::ofMinor(4999, new Currency('USD', 2))           // $49.99
+Money::ofDecimal('0.00100000', new Currency('BTC', 8)) // 100 000 satoshis
 ```
 
-### Initiating an attempt
+`Currency` carries no registry — precision is resolved by the infrastructure layer before entering the domain.
 
-```php
-use Payroad\Application\UseCase\InitiateAttempt\InitiateAttemptCommand;
-use Payroad\Domain\Payment\PaymentMethodType;
+### State machines are embedded per flow
 
-$command = new InitiateAttemptCommand(
-    paymentId:    $payment->getId(),
-    methodType:   PaymentMethodType::CARD,
-    providerType: 'stripe',
-);
+Each attempt subclass validates transitions before applying them:
 
-$attempt = $useCase->execute($command);
+```
+Card:    PENDING → AWAITING_CONFIRMATION → AUTHORIZED → PROCESSING → SUCCEEDED
+                 └──────────────────────→             └→ FAILED
+                                                       └→ CANCELED
+
+Crypto:  PENDING → PROCESSING → SUCCEEDED | FAILED | EXPIRED
+
+P2P:     PENDING → AWAITING_CONFIRMATION → PROCESSING → SUCCEEDED | FAILED | EXPIRED
+
+Cash:    PENDING → AWAITING_CONFIRMATION → SUCCEEDED | FAILED | EXPIRED
 ```
 
-### Handling an incoming webhook
+An invalid transition throws `\DomainException` before any state changes.
 
-```php
-use Payroad\Application\UseCase\HandleWebhook\HandleWebhookCommand;
+### Domain events
 
-$command = new HandleWebhookCommand(
-    providerType: 'stripe',
-    payload:      $request->toArray(),
-    headers:      $request->headers->all(),
-);
+Every state change produces typed events consumed by your application layer:
 
-$useCase->execute($command);
-```
+| Event | Trigger |
+|-------|---------|
+| `PaymentCreated` | Payment created |
+| `PaymentProcessingStarted` | First attempt initiated |
+| `PaymentSucceeded` | Attempt settled |
+| `PaymentRetryAvailable` | Attempt failed, payment re-queued for retry |
+| `PaymentCanceled` / `PaymentExpired` / `PaymentFailed` | Terminal transitions |
+| `AttemptInitiated` | Attempt created |
+| `AttemptAuthorized` | Card authorized, ready to capture |
+| `AttemptRequiresUserAction` | 3DS / P2P redirect needed |
+| `AttemptSucceeded` / `AttemptFailed` / `AttemptCanceled` / `AttemptExpired` | Terminal attempt states |
 
 ---
 
 ## Implementing a provider
 
-Create a new Composer package (e.g. `paylet/payment-stripe`) and implement:
+Create a Composer package and implement the port interface for your payment method:
 
 ```php
-// 1. Specific data for this provider
-final readonly class StripeSpecificData implements PaymentSpecificData { ... }
+use Payroad\Domain\Attempt\AttemptStatus;
+use Payroad\Domain\Attempt\PaymentAttemptId;
+use Payroad\Domain\Money\Money;
+use Payroad\Domain\Payment\PaymentId;
+use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
+use Payroad\Port\Provider\Card\CardAttemptContext;
+use Payroad\Port\Provider\Card\CardProviderInterface;
+use Payroad\Port\Provider\Card\CaptureResult;
+use Payroad\Port\Provider\WebhookResult;
 
-// 2. Provider — handles API calls and webhook parsing
-final class StripePaymentProvider implements PaymentProviderInterface
+final class StripeCardProvider implements CardProviderInterface
 {
-    public function supports(string $providerType): bool
+    public function name(): string
     {
-        return $providerType === 'stripe';
+        return 'stripe';
     }
 
-    public function buildInitialSpecificData(): PaymentSpecificData
-    {
-        return new StripeSpecificData();
-    }
+    public function initiateCardAttempt(
+        PaymentAttemptId   $id,
+        PaymentId          $paymentId,
+        string             $providerName,
+        Money              $amount,
+        CardAttemptContext $context,
+    ): CardPaymentAttempt {
+        $intent = $this->stripe->paymentIntents->create([
+            'amount'   => $amount->getMinorAmount(),
+            'currency' => strtolower((string) $amount->getCurrency()),
+        ]);
 
-    public function initiate(PaymentAttempt $attempt, Money $amount): void
-    {
-        // Call Stripe API, then:
+        $attempt = CardPaymentAttempt::create(
+            $id, $paymentId, $providerName, $amount,
+            new StripeCardData(clientSecret: $intent->client_secret),
+        );
         $attempt->setProviderReference($intent->id);
-        $attempt->updateSpecificData(new StripeSpecificData(
-            paymentIntentId: $intent->id,
-            clientSecret:    $intent->client_secret,
-        ));
+
+        return $attempt;
+    }
+
+    public function captureAttempt(string $providerReference, ?Money $amount = null): CaptureResult
+    {
+        $this->stripe->paymentIntents->capture($providerReference);
+
+        return new CaptureResult(AttemptStatus::SUCCEEDED, 'succeeded');
     }
 
     public function parseWebhook(array $payload, array $headers): WebhookResult
     {
-        // Validate Stripe-Signature header, parse event, map to AttemptStatus
+        // verify signature, parse event …
+
         return new WebhookResult(
             providerReference: $payload['data']['object']['id'],
+            providerStatus:    $payload['data']['object']['status'],
             newStatus:         AttemptStatus::SUCCEEDED,
-            providerStatus:    'succeeded',
             statusChanged:     true,
         );
     }
+
+    // … voidAttempt, initiateRefund, savePaymentMethod
 }
 ```
 
-The gateway registers the provider in `ProviderRegistryInterface` and the matching state machine in `StateMachineRegistryInterface`. No changes to this package are needed.
+Register the provider in your `ProviderRegistryInterface` implementation. No changes to this package are needed.
 
 ---
 
-## Requirements
+## Testing
 
-- PHP 8.2+
-- `ramsey/uuid` ^4.0
+```bash
+composer install
+vendor/bin/phpunit
+```
 
-## Repository
+Run a single test class or method:
 
-[https://github.com/zykovnick/payment-core](https://github.com/zykovnick/payment-core)
+```bash
+vendor/bin/phpunit tests/Domain/Attempt/PaymentAttemptTest.php
+vendor/bin/phpunit --filter testPaymentMarkedSucceededOnSyncCapture
+```
+
+---
+
+## Ecosystem
+
+| Package | Description |
+|---------|-------------|
+| `payroad/payroad-core` | **This package** |
+| `payroad/stripe-provider` | Card payments via Stripe |
+| `payroad/nowpayments-provider` | Crypto payments via NOWPayments |
+| `payroad/wechat-provider` | P2P payments via WeChat Pay |
+| `payroad/demo` | Symfony reference application |
+
+---
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

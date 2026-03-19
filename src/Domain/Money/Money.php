@@ -3,8 +3,14 @@
 namespace Payroad\Domain\Money;
 
 /**
- * Represents a fiat monetary amount in minor units (e.g. cents for USD).
+ * Represents a monetary amount in minor units (the smallest indivisible unit).
+ *
+ * Works uniformly for fiat and crypto — the decimal precision is carried
+ * by the Currency value object, not by Money itself.
+ *
  * All arithmetic uses integer math to avoid floating-point errors.
+ *
+ * @see Currency for precision semantics and the ETH/wei overflow warning.
  */
 final readonly class Money
 {
@@ -23,12 +29,16 @@ final readonly class Money
     }
 
     /**
-     * Constructs Money from a decimal string (e.g. "19.99") using bcmath
-     * to avoid floating-point rounding errors.
+     * Constructs Money from a decimal string using bcmath.
+     * The precision is taken from the Currency value object.
+     *
+     * Prefer this factory for high-precision crypto amounts where the raw
+     * minor-unit value may approach PHP int range (e.g. large ETH amounts in wei).
      */
     public static function ofDecimal(string $amount, Currency $currency): self
     {
-        $minor = (int) bcmul($amount, '100', 0);
+        $exp   = $currency->precision;
+        $minor = (int) bcmul($amount, bcpow('10', (string) $exp, 0), 0);
         return new self($minor, $currency);
     }
 
@@ -41,6 +51,14 @@ final readonly class Money
     public function subtract(self $other): self
     {
         $this->assertSameCurrency($other);
+
+        if ($other->minorAmount > $this->minorAmount) {
+            throw new \InvalidArgumentException(
+                "Cannot subtract {$other->toDecimalString()} {$other->currency->code} "
+                . "from {$this->toDecimalString()} {$this->currency->code}: result would be negative."
+            );
+        }
+
         return new self($this->minorAmount - $other->minorAmount, $this->currency);
     }
 
@@ -73,7 +91,11 @@ final readonly class Money
 
     public function toDecimalString(): string
     {
-        return bcdiv((string) $this->minorAmount, '100', 2);
+        $exp = $this->currency->precision;
+        if ($exp === 0) {
+            return (string) $this->minorAmount;
+        }
+        return bcdiv((string) $this->minorAmount, bcpow('10', (string) $exp, 0), $exp);
     }
 
     private function assertSameCurrency(self $other): void

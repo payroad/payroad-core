@@ -2,23 +2,19 @@
 
 namespace Tests\Stub;
 
-use Payroad\Domain\Flow\PaymentSpecificData;
-use Payroad\Domain\Payment\PaymentMethodType;
+use Payroad\Domain\PaymentFlow\Card\CardAttemptData;
+use Payroad\Domain\PaymentFlow\Card\ThreeDSData;
 
-final class StubSpecificData implements PaymentSpecificData
+final class StubSpecificData implements CardAttemptData
 {
-    public function getMethodType(): PaymentMethodType
-    {
-        return PaymentMethodType::CARD;
-    }
-
-    public function getProviderType(): string
-    {
-        return 'stub';
-    }
-
-    public function getVersion(): int
-    {
-        return 1;
-    }
+    public function getBin(): ?string            { return '424242'; }
+    public function getLast4(): ?string          { return '4242'; }
+    public function getExpiryMonth(): ?int       { return 12; }
+    public function getExpiryYear(): ?int        { return 2030; }
+    public function getCardholderName(): ?string { return 'John Doe'; }
+    public function getCardBrand(): ?string      { return 'visa'; }
+    public function getFundingType(): ?string    { return 'credit'; }
+    public function getIssuingCountry(): ?string { return 'US'; }
+    public function requiresUserAction(): bool   { return false; }
+    public function getThreeDSData(): ?ThreeDSData { return null; }
 }

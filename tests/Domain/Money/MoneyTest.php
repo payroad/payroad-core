@@ -14,8 +14,8 @@ final class MoneyTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->usd = Currency::of('USD');
-        $this->eur = Currency::of('EUR');
+        $this->usd = new Currency('USD', 2);
+        $this->eur = new Currency('EUR', 2);
     }
 
     public function testOfMinorStoresAmountCorrectly(): void
@@ -126,5 +126,42 @@ final class MoneyTest extends TestCase
     {
         $money = Money::ofMinor(0, $this->usd);
         $this->assertSame('0.00', $money->toDecimalString());
+    }
+
+    // ── ISO 4217 non-standard subunit exponents ───────────────────────────────
+
+    public function testOfDecimalForJpyUsesZeroDecimalPlaces(): void
+    {
+        $jpy   = new Currency('JPY', 0);
+        $money = Money::ofDecimal('1500', $jpy);
+        $this->assertSame(1500, $money->getMinorAmount());
+    }
+
+    public function testOfDecimalForKrwUsesZeroDecimalPlaces(): void
+    {
+        $krw   = new Currency('KRW', 0);
+        $money = Money::ofDecimal('50000', $krw);
+        $this->assertSame(50000, $money->getMinorAmount());
+    }
+
+    public function testOfDecimalForKwdUsesThreeDecimalPlaces(): void
+    {
+        $kwd   = new Currency('KWD', 3);
+        $money = Money::ofDecimal('10.500', $kwd);
+        $this->assertSame(10500, $money->getMinorAmount());
+    }
+
+    public function testToDecimalStringForJpyReturnsWholeNumber(): void
+    {
+        $jpy   = new Currency('JPY', 0);
+        $money = Money::ofMinor(1500, $jpy);
+        $this->assertSame('1500', $money->toDecimalString());
+    }
+
+    public function testToDecimalStringForKwdReturnsThreeDecimalPlaces(): void
+    {
+        $kwd   = new Currency('KWD', 3);
+        $money = Money::ofMinor(10500, $kwd);
+        $this->assertSame('10.500', $money->toDecimalString());
     }
 }

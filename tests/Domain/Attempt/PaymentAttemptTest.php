@@ -2,39 +2,42 @@
 
 namespace Tests\Domain\Attempt;
 
+use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStatus;
+use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
 use Payroad\Domain\Attempt\PaymentAttempt;
-use Payroad\Domain\Event\Attempt\AttemptFailed;
-use Payroad\Domain\Event\Attempt\AttemptInitiated;
-use Payroad\Domain\Event\Attempt\AttemptStatusChanged;
-use Payroad\Domain\Event\Attempt\AttemptSucceeded;
+use Payroad\Domain\Attempt\Event\AttemptCanceled;
+use Payroad\Domain\Attempt\Event\AttemptFailed;
+use Payroad\Domain\Attempt\Event\AttemptInitiated;
+use Payroad\Domain\Attempt\Event\AttemptRequiresUserAction;
+use Payroad\Domain\Attempt\Event\AttemptStatusChanged;
+use Payroad\Domain\Attempt\Event\AttemptSucceeded;
 use Payroad\Domain\Money\Currency;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\CustomerId;
-use Payroad\Domain\Payment\IdempotencyKey;
-use Payroad\Domain\Payment\MerchantId;
 use Payroad\Domain\Payment\Payment;
+use Payroad\Domain\Payment\PaymentId;
 use Payroad\Domain\Payment\PaymentMetadata;
-use Payroad\Domain\Payment\PaymentMethodType;
+use Payroad\Domain\PaymentMethodType;
 use Tests\Stub\StubSpecificData;
 use PHPUnit\Framework\TestCase;
 
 final class PaymentAttemptTest extends TestCase
 {
-    private function makeAttempt(): PaymentAttempt
+    private function makeAttempt(): CardPaymentAttempt
     {
         $payment = Payment::create(
-            Money::ofMinor(1000, Currency::of('USD')),
-            MerchantId::of('merchant-1'),
+            PaymentId::generate(),
+            Money::ofMinor(1000, new Currency('USD', 2)),
             CustomerId::of('customer-1'),
-            IdempotencyKey::of('idem-key-1'),
             new PaymentMetadata()
         );
 
-        return PaymentAttempt::create(
+        return CardPaymentAttempt::create(
+            PaymentAttemptId::generate(),
             $payment->getId(),
-            PaymentMethodType::CARD,
             'stub',
+            Money::ofMinor(1000, new Currency('USD', 2)),
             new StubSpecificData()
         );
     }
@@ -56,6 +59,13 @@ final class PaymentAttemptTest extends TestCase
         $this->assertInstanceOf(AttemptInitiated::class, $events[0]);
     }
 
+    public function testCreateSetsCorrectMethodType(): void
+    {
+        $attempt = $this->makeAttempt();
+
+        $this->assertSame(PaymentMethodType::CARD, $attempt->getMethodType());
+    }
+
     public function testSetProviderReferenceUpdatesProviderReference(): void
     {
         $attempt = $this->makeAttempt();
@@ -66,34 +76,34 @@ final class PaymentAttemptTest extends TestCase
         $this->assertSame('ref-123', $attempt->getProviderReference());
     }
 
-    public function testUpdateSpecificDataReplacesSpecificData(): void
+    public function testUpdateDataReplacesTypedData(): void
     {
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
         $newData = new StubSpecificData();
-        $attempt->updateSpecificData($newData);
+        $attempt->updateCardData($newData);
 
-        $this->assertSame($newData, $attempt->getSpecificData());
+        $this->assertSame($newData, $attempt->getData());
     }
 
-    public function testTransitionToUpdatesStatusAndProviderStatus(): void
+    public function testApplyTransitionUpdatesStatusAndProviderStatus(): void
     {
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->transitionTo(AttemptStatus::PROCESSING, 'processing');
+        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
 
         $this->assertSame(AttemptStatus::PROCESSING, $attempt->getStatus());
         $this->assertSame('processing', $attempt->getProviderStatus());
     }
 
-    public function testTransitionToRecordsAttemptStatusChangedEventWithCorrectOldAndNewStatus(): void
+    public function testApplyTransitionRecordsAttemptStatusChangedEventWithCorrectOldAndNewStatus(): void
     {
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->transitionTo(AttemptStatus::PROCESSING, 'processing');
+        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
         $events = $attempt->releaseEvents();
 
         $statusChangedEvents = array_filter($events, fn($e) => $e instanceof AttemptStatusChanged);
@@ -105,26 +115,26 @@ final class PaymentAttemptTest extends TestCase
         $this->assertSame(AttemptStatus::PROCESSING, $event->newStatus);
     }
 
-    public function testTransitionToSucceededRecordsAttemptSucceededEvent(): void
+    public function testApplyTransitionToSucceededRecordsAttemptSucceededEvent(): void
     {
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
-        $attempt->transitionTo(AttemptStatus::PROCESSING, 'processing');
+        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
         $attempt->releaseEvents();
 
-        $attempt->transitionTo(AttemptStatus::SUCCEEDED, 'succeeded');
+        $attempt->applyTransition(AttemptStatus::SUCCEEDED, 'succeeded');
         $events = $attempt->releaseEvents();
 
         $succeededEvents = array_filter($events, fn($e) => $e instanceof AttemptSucceeded);
         $this->assertCount(1, $succeededEvents);
     }
 
-    public function testTransitionToFailedRecordsAttemptFailedEventWithReason(): void
+    public function testApplyTransitionToFailedRecordsAttemptFailedEventWithReason(): void
     {
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->transitionTo(AttemptStatus::FAILED, 'failed', 'insufficient_funds');
+        $attempt->applyTransition(AttemptStatus::FAILED, 'failed', 'insufficient_funds');
         $events = $attempt->releaseEvents();
 
         $failedEvents = array_filter($events, fn($e) => $e instanceof AttemptFailed);
@@ -135,24 +145,39 @@ final class PaymentAttemptTest extends TestCase
         $this->assertSame('insufficient_funds', $event->reason);
     }
 
-    public function testTransitionToCanceledRecordsAttemptFailedEvent(): void
+    public function testApplyTransitionToAwaitingConfirmationRecordsAttemptRequiresUserActionEvent(): void
     {
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->transitionTo(AttemptStatus::CANCELED, 'canceled');
+        $attempt->applyTransition(AttemptStatus::AWAITING_CONFIRMATION, 'awaiting_confirmation');
         $events = $attempt->releaseEvents();
 
-        $failedEvents = array_filter($events, fn($e) => $e instanceof AttemptFailed);
-        $this->assertCount(1, $failedEvents);
+        $actionEvents = array_filter($events, fn($e) => $e instanceof AttemptRequiresUserAction);
+        $this->assertCount(1, $actionEvents);
     }
 
-    public function testTransitionToProcessingDoesNotRecordAttemptSucceededOrAttemptFailed(): void
+    public function testApplyTransitionToCanceledRecordsAttemptCanceledEvent(): void
     {
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->transitionTo(AttemptStatus::PROCESSING, 'processing');
+        // Card flow: CANCELED is reachable from AWAITING_CONFIRMATION
+        $attempt->applyTransition(AttemptStatus::AWAITING_CONFIRMATION, 'awaiting_confirmation');
+        $attempt->releaseEvents();
+        $attempt->applyTransition(AttemptStatus::CANCELED, 'canceled');
+        $events = $attempt->releaseEvents();
+
+        $canceledEvents = array_filter($events, fn($e) => $e instanceof AttemptCanceled);
+        $this->assertCount(1, $canceledEvents);
+    }
+
+    public function testApplyTransitionToProcessingDoesNotRecordAttemptSucceededOrAttemptFailed(): void
+    {
+        $attempt = $this->makeAttempt();
+        $attempt->releaseEvents();
+
+        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
         $events = $attempt->releaseEvents();
 
         $succeededEvents = array_filter($events, fn($e) => $e instanceof AttemptSucceeded);
@@ -177,5 +202,16 @@ final class PaymentAttemptTest extends TestCase
     {
         $attempt = $this->makeAttempt();
         $this->assertSame(0, $attempt->getVersion());
+    }
+
+    public function testIncrementVersionIncrementsOnEachCall(): void
+    {
+        $attempt = $this->makeAttempt();
+
+        $attempt->incrementVersion();
+        $this->assertSame(1, $attempt->getVersion());
+
+        $attempt->incrementVersion();
+        $this->assertSame(2, $attempt->getVersion());
     }
 }

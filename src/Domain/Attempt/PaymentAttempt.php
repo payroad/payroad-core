@@ -3,65 +3,75 @@
 namespace Payroad\Domain\Attempt;
 
 use DateTimeImmutable;
-use Payroad\Domain\Attempt\StateMachine\AttemptStateMachineInterface;
-use Payroad\Domain\Event\Attempt\AttemptFailed;
-use Payroad\Domain\Event\Attempt\AttemptInitiated;
-use Payroad\Domain\Event\Attempt\AttemptStatusChanged;
-use Payroad\Domain\Event\Attempt\AttemptSucceeded;
-use Payroad\Domain\Event\DomainEvent;
-use Payroad\Domain\Flow\PaymentSpecificData;
+use Payroad\Domain\AggregateRootTrait;
+use Payroad\Domain\Attempt\AttemptStateMachineInterface;
+use Payroad\Domain\Attempt\AttemptData;
+use Payroad\Domain\Attempt\Event\AttemptAuthorized;
+use Payroad\Domain\Attempt\Event\AttemptCanceled;
+use Payroad\Domain\Attempt\Event\AttemptExpired;
+use Payroad\Domain\Attempt\Event\AttemptFailed;
+use Payroad\Domain\Attempt\Event\AttemptRequiresUserAction;
+use Payroad\Domain\Attempt\Event\AttemptStatusChanged;
+use Payroad\Domain\Attempt\Event\AttemptSucceeded;
+use Payroad\Domain\Attempt\Exception\InvalidTransitionException;
+use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
-use Payroad\Domain\Payment\PaymentMethodType;
 
-final class PaymentAttempt
+/**
+ * Abstract base aggregate for all payment attempt types.
+ * Use typed subclasses: CardPaymentAttempt, CryptoPaymentAttempt, P2PPaymentAttempt, CashPaymentAttempt.
+ */
+abstract class PaymentAttempt
 {
-    private AttemptId           $id;
-    private PaymentId           $paymentId;
-    private PaymentMethodType   $methodType;
-    private string              $providerType;
-    private ?string             $providerReference = null;
-    private AttemptStatus       $status;
-    private string              $providerStatus;
-    private PaymentSpecificData $specificData;
-    private DateTimeImmutable   $createdAt;
+    use AggregateRootTrait;
 
-    /** Incremented on every save. Used for optimistic locking. */
-    private int $version = 0;
+    private PaymentAttemptId  $id;
+    private PaymentId         $paymentId;
+    private string            $providerName;
+    private Money             $amount;
+    private ?string           $providerReference = null;
+    private AttemptStatus     $status;
+    private string            $providerStatus;
+    private DateTimeImmutable $createdAt;
 
-    private array $recordedEvents = [];
-
-    private function __construct(
-        PaymentId           $paymentId,
-        PaymentMethodType   $methodType,
-        string              $providerType,
-        PaymentSpecificData $specificData
-    ) {
-        $this->id             = AttemptId::generate();
+    protected function __construct(PaymentAttemptId $id, PaymentId $paymentId, string $providerName, Money $amount)
+    {
+        $this->id             = $id;
         $this->paymentId      = $paymentId;
-        $this->methodType     = $methodType;
-        $this->providerType   = $providerType;
+        $this->providerName   = $providerName;
+        $this->amount         = $amount;
         $this->status         = AttemptStatus::PENDING;
         $this->providerStatus = 'pending';
-        $this->specificData   = $specificData;
         $this->createdAt      = new DateTimeImmutable();
     }
 
-    public static function create(
-        PaymentId           $paymentId,
-        PaymentMethodType   $methodType,
-        string              $providerType,
-        PaymentSpecificData $specificData
-    ): self {
-        $attempt = new self($paymentId, $methodType, $providerType, $specificData);
+    abstract public function getMethodType(): PaymentMethodType;
 
-        $attempt->record(new AttemptInitiated(
-            $attempt->id,
-            $paymentId,
-            $methodType,
-            $providerType,
-        ));
+    /** Returns the flow-specific data for this attempt. */
+    abstract public function getData(): AttemptData;
 
-        return $attempt;
+    /**
+     * Updates flow-specific data (e.g. confirmation count, txHash).
+     * Each subclass validates that the concrete type matches its expected interface.
+     */
+    abstract public function updateSpecificData(AttemptData $data): void;
+
+    abstract protected function stateMachine(): AttemptStateMachineInterface;
+
+    /**
+     * Validates and applies a status transition via the embedded state machine.
+     * Throws InvalidTransitionException if the transition is not allowed.
+     */
+    public function applyTransition(
+        AttemptStatus $to,
+        string        $providerStatus,
+        string        $reason = ''
+    ): void {
+        if (!$this->stateMachine()->canTransition($this->status, $to)) {
+            throw new InvalidTransitionException($this->status, $to, $this->getMethodType()->value);
+        }
+
+        $this->doTransition($to, $providerStatus, $reason);
     }
 
     /** Called by the provider after the external API returns a reference. */
@@ -70,20 +80,20 @@ final class PaymentAttempt
         $this->providerReference = $reference;
     }
 
-    /** Called by the provider to persist updated flow data (e.g. txHash, confirmations). */
-    public function updateSpecificData(PaymentSpecificData $data): void
-    {
-        $this->specificData = $data;
-    }
+    // ── Getters ──────────────────────────────────────────────────────────────
 
-    /**
-     * Applies a status transition. Intended to be called exclusively by
-     * AttemptStateMachineInterface implementations — not from application or
-     * infrastructure code directly.
-     *
-     * @internal
-     */
-    public function transitionTo(
+    public function getId(): PaymentAttemptId     { return $this->id; }
+    public function getPaymentId(): PaymentId     { return $this->paymentId; }
+    public function getProviderName(): string      { return $this->providerName; }
+    public function getAmount(): Money             { return $this->amount; }
+    public function getProviderReference(): ?string { return $this->providerReference; }
+    public function getStatus(): AttemptStatus    { return $this->status; }
+    public function getProviderStatus(): string   { return $this->providerStatus; }
+    public function getCreatedAt(): DateTimeImmutable { return $this->createdAt; }
+
+    // ── Internal transition ───────────────────────────────────────────────────
+
+    private function doTransition(
         AttemptStatus $newStatus,
         string        $newProviderStatus,
         string        $reason = ''
@@ -101,38 +111,18 @@ final class PaymentAttempt
             $newProviderStatus,
         ));
 
-        if ($newStatus->isSuccess()) {
-            $this->record(new AttemptSucceeded($this->id, $this->paymentId, $this->methodType));
-        } elseif ($newStatus->isFailure()) {
-            $this->record(new AttemptFailed($this->id, $this->paymentId, $this->methodType, $reason));
+        $semanticEvent = match ($newStatus) {
+            AttemptStatus::AUTHORIZED            => new AttemptAuthorized($this->id, $this->paymentId, $this->getMethodType()),
+            AttemptStatus::AWAITING_CONFIRMATION => new AttemptRequiresUserAction($this->id, $this->paymentId, $this->getMethodType()),
+            AttemptStatus::SUCCEEDED             => new AttemptSucceeded($this->id, $this->paymentId, $this->getMethodType()),
+            AttemptStatus::FAILED                => new AttemptFailed($this->id, $this->paymentId, $this->getMethodType(), $reason),
+            AttemptStatus::CANCELED              => new AttemptCanceled($this->id, $this->paymentId, $this->getMethodType(), $reason),
+            AttemptStatus::EXPIRED               => new AttemptExpired($this->id, $this->paymentId, $this->getMethodType()),
+            default                              => null,
+        };
+
+        if ($semanticEvent !== null) {
+            $this->record($semanticEvent);
         }
-    }
-
-    // ── Getters ──────────────────────────────────────────────────────────────
-
-    public function getId(): AttemptId               { return $this->id; }
-    public function getPaymentId(): PaymentId         { return $this->paymentId; }
-    public function getMethodType(): PaymentMethodType { return $this->methodType; }
-    public function getProviderType(): string          { return $this->providerType; }
-    public function getProviderReference(): ?string    { return $this->providerReference; }
-    public function getStatus(): AttemptStatus         { return $this->status; }
-    public function getProviderStatus(): string        { return $this->providerStatus; }
-    public function getSpecificData(): PaymentSpecificData { return $this->specificData; }
-    public function getCreatedAt(): DateTimeImmutable  { return $this->createdAt; }
-    public function getVersion(): int                  { return $this->version; }
-
-    // ── Event recording ──────────────────────────────────────────────────────
-
-    private function record(DomainEvent $event): void
-    {
-        $this->recordedEvents[] = $event;
-    }
-
-    /** @return DomainEvent[] */
-    public function releaseEvents(): array
-    {
-        $events               = $this->recordedEvents;
-        $this->recordedEvents = [];
-        return $events;
     }
 }

@@ -3,63 +3,60 @@
 namespace Payroad\Domain\Payment;
 
 use DateTimeImmutable;
-use Payroad\Domain\Attempt\AttemptId;
-use Payroad\Domain\Event\DomainEvent;
-use Payroad\Domain\Event\Payment\PaymentCanceled;
-use Payroad\Domain\Event\Payment\PaymentCreated;
-use Payroad\Domain\Event\Payment\PaymentExpired;
-use Payroad\Domain\Event\Payment\PaymentFailed;
-use Payroad\Domain\Event\Payment\PaymentSucceeded;
+use Payroad\Domain\AggregateRootTrait;
+use Payroad\Domain\Attempt\PaymentAttemptId;
+use Payroad\Domain\Payment\Event\PaymentCanceled;
+use Payroad\Domain\Payment\Event\PaymentCreated;
+use Payroad\Domain\Payment\Event\PaymentExpired;
+use Payroad\Domain\Payment\Event\PaymentProcessingStarted;
+use Payroad\Domain\Payment\Event\PaymentRetryAvailable;
+use Payroad\Domain\Payment\Event\PaymentFailed;
+use Payroad\Domain\Payment\Event\PaymentPartiallyRefunded;
+use Payroad\Domain\Payment\Event\PaymentRefunded;
+use Payroad\Domain\Payment\Event\PaymentSucceeded;
 use Payroad\Domain\Money\Money;
+use Payroad\Domain\Refund\RefundId;
 
 /**
  * Thin business-document aggregate.
- * Represents the merchant's intent to collect a payment.
+ * Represents the application's intent to collect a payment from a customer.
  * Does NOT contain attempts — they are a separate aggregate.
  */
 final class Payment
 {
-    private PaymentId       $id;
-    private Money           $amount;
-    private MerchantId      $merchantId;
-    private CustomerId      $customerId;
-    private IdempotencyKey  $idempotencyKey;
-    private PaymentStatus   $status;
-    private ?AttemptId      $successfulAttemptId = null;
-    private PaymentMetadata $metadata;
-    private DateTimeImmutable $createdAt;
-    private ?DateTimeImmutable $expiresAt;
+    use AggregateRootTrait;
 
-    /** Incremented on every save. Used for optimistic locking. */
-    private int $version = 0;
-
-    private array $recordedEvents = [];
+    private PaymentId           $id;
+    private Money               $amount;
+    private CustomerId          $customerId;
+    private PaymentStatus       $status;
+    private ?PaymentAttemptId   $successfulAttemptId = null;
+    private PaymentMetadata     $metadata;
+    private DateTimeImmutable   $createdAt;
+    private ?DateTimeImmutable  $expiresAt;
+    private Money               $refundedAmount;
 
     private function __construct(
         PaymentId       $id,
         Money           $amount,
-        MerchantId      $merchantId,
         CustomerId      $customerId,
-        IdempotencyKey  $idempotencyKey,
         PaymentMetadata $metadata,
         ?DateTimeImmutable $expiresAt
     ) {
         $this->id             = $id;
         $this->amount         = $amount;
-        $this->merchantId     = $merchantId;
         $this->customerId     = $customerId;
-        $this->idempotencyKey = $idempotencyKey;
         $this->status         = PaymentStatus::PENDING;
         $this->metadata       = $metadata;
         $this->createdAt      = new DateTimeImmutable();
         $this->expiresAt      = $expiresAt;
+        $this->refundedAmount = Money::ofMinor(0, $amount->getCurrency());
     }
 
     public static function create(
+        PaymentId       $id,
         Money           $amount,
-        MerchantId      $merchantId,
         CustomerId      $customerId,
-        IdempotencyKey  $idempotencyKey,
         PaymentMetadata $metadata  = new PaymentMetadata(),
         ?DateTimeImmutable $expiresAt = null
     ): self {
@@ -67,20 +64,11 @@ final class Payment
             throw new \InvalidArgumentException('Payment amount must be greater than zero.');
         }
 
-        $payment = new self(
-            PaymentId::generate(),
-            $amount,
-            $merchantId,
-            $customerId,
-            $idempotencyKey,
-            $metadata,
-            $expiresAt
-        );
+        $payment = new self($id, $amount, $customerId, $metadata, $expiresAt);
 
         $payment->record(new PaymentCreated(
             $payment->id,
             $payment->amount,
-            $payment->merchantId,
             $payment->customerId,
         ));
 
@@ -95,20 +83,43 @@ final class Payment
         }
 
         $this->status = PaymentStatus::PROCESSING;
+        $this->record(new PaymentProcessingStarted($this->id));
     }
 
-    public function markSucceeded(AttemptId $attemptId): void
+    /**
+     * Called when an attempt fails and the payment is open for a new attempt.
+     * Moves PROCESSING → PENDING so the next InitiateAttempt call is allowed.
+     */
+    public function markRetryable(): void
+    {
+        if ($this->status !== PaymentStatus::PROCESSING) {
+            return;
+        }
+
+        $this->status = PaymentStatus::PENDING;
+        $this->record(new PaymentRetryAvailable($this->id));
+    }
+
+    public function markSucceeded(PaymentAttemptId $attemptId): void
     {
         if ($this->status->isTerminal()) {
             return;
         }
 
-        $this->status               = PaymentStatus::SUCCEEDED;
-        $this->successfulAttemptId  = $attemptId;
+        $this->status              = PaymentStatus::SUCCEEDED;
+        $this->successfulAttemptId = $attemptId;
 
         $this->record(new PaymentSucceeded($this->id, $attemptId));
     }
 
+    /**
+     * Marks the payment as permanently failed.
+     *
+     * Called by the application layer when no further attempts are permitted —
+     * for example, when a retry-limit policy is exceeded or fraud is detected.
+     * Distinct from CANCELED (merchant-initiated) and EXPIRED (TTL-based).
+     * Terminal — no new attempts can be initiated after this point.
+     */
     public function markFailed(): void
     {
         if ($this->status->isTerminal()) {
@@ -119,12 +130,47 @@ final class Payment
         $this->record(new PaymentFailed($this->id));
     }
 
+    /**
+     * Records a successful refund against this payment.
+     * Updates the running refundedAmount and transitions status to
+     * PARTIALLY_REFUNDED or REFUNDED depending on whether the full amount is returned.
+     *
+     * Called by HandleRefundWebhookUseCase when a refund reaches SUCCEEDED.
+     *
+     * @throws \DomainException if the payment is not in a refundable status
+     *                          or if the refund amount would exceed the payment amount.
+     */
+    public function addRefund(RefundId $refundId, Money $amount): void
+    {
+        if (!$this->status->isRefundable()) {
+            throw new \DomainException(
+                "Cannot add refund to payment \"{$this->id->value}\" in status \"{$this->status->value}\"."
+            );
+        }
+
+        $newRefundedAmount = $this->refundedAmount->add($amount);
+
+        if ($newRefundedAmount->isGreaterThan($this->amount)) {
+            throw new \DomainException(
+                "Refund amount exceeds the payment amount for payment \"{$this->id->value}\"."
+            );
+        }
+
+        $this->refundedAmount = $newRefundedAmount;
+
+        if ($this->refundedAmount->equals($this->amount)) {
+            $this->status = PaymentStatus::REFUNDED;
+            $this->record(new PaymentRefunded($this->id, $refundId, $this->refundedAmount));
+        } else {
+            $this->status = PaymentStatus::PARTIALLY_REFUNDED;
+            $this->record(new PaymentPartiallyRefunded($this->id, $refundId, $amount, $this->refundedAmount));
+        }
+    }
+
     public function cancel(): void
     {
         if ($this->status->isTerminal()) {
-            throw new \LogicException(
-                "Cannot cancel a payment in terminal status \"{$this->status->value}\"."
-            );
+            return;
         }
 
         $this->status = PaymentStatus::CANCELED;
@@ -149,30 +195,14 @@ final class Payment
 
     // ── Getters ──────────────────────────────────────────────────────────────
 
-    public function getId(): PaymentId                  { return $this->id; }
-    public function getAmount(): Money                   { return $this->amount; }
-    public function getMerchantId(): MerchantId          { return $this->merchantId; }
-    public function getCustomerId(): CustomerId          { return $this->customerId; }
-    public function getIdempotencyKey(): IdempotencyKey  { return $this->idempotencyKey; }
-    public function getStatus(): PaymentStatus           { return $this->status; }
-    public function getMetadata(): PaymentMetadata       { return $this->metadata; }
-    public function getSuccessfulAttemptId(): ?AttemptId { return $this->successfulAttemptId; }
-    public function getCreatedAt(): DateTimeImmutable    { return $this->createdAt; }
-    public function getExpiresAt(): ?DateTimeImmutable   { return $this->expiresAt; }
-    public function getVersion(): int                    { return $this->version; }
-
-    // ── Event recording ──────────────────────────────────────────────────────
-
-    private function record(DomainEvent $event): void
-    {
-        $this->recordedEvents[] = $event;
-    }
-
-    /** @return DomainEvent[] */
-    public function releaseEvents(): array
-    {
-        $events               = $this->recordedEvents;
-        $this->recordedEvents = [];
-        return $events;
-    }
+    public function getId(): PaymentId                         { return $this->id; }
+    public function getAmount(): Money                          { return $this->amount; }
+    public function getCustomerId(): CustomerId                 { return $this->customerId; }
+    public function getStatus(): PaymentStatus                  { return $this->status; }
+    public function getMetadata(): PaymentMetadata              { return $this->metadata; }
+    public function getSuccessfulAttemptId(): ?PaymentAttemptId { return $this->successfulAttemptId; }
+    public function getCreatedAt(): DateTimeImmutable           { return $this->createdAt; }
+    public function getExpiresAt(): ?DateTimeImmutable          { return $this->expiresAt; }
+    public function getRefundedAmount(): Money                  { return $this->refundedAmount; }
+    public function getRefundableAmount(): Money                { return $this->amount->subtract($this->refundedAmount); }
 }

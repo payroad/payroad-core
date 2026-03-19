@@ -4,44 +4,40 @@ namespace Tests\Domain\Payment;
 
 use DateTimeImmutable;
 use InvalidArgumentException;
-use LogicException;
-use Payroad\Domain\Event\Payment\PaymentCanceled;
-use Payroad\Domain\Event\Payment\PaymentCreated;
-use Payroad\Domain\Event\Payment\PaymentExpired;
-use Payroad\Domain\Event\Payment\PaymentSucceeded;
+use Payroad\Domain\Payment\Event\PaymentCanceled;
+use Payroad\Domain\Payment\Event\PaymentCreated;
+use Payroad\Domain\Payment\Event\PaymentExpired;
+use Payroad\Domain\Payment\Event\PaymentFailed;
+use Payroad\Domain\Payment\Event\PaymentProcessingStarted;
+use Payroad\Domain\Payment\Event\PaymentRetryAvailable;
+use Payroad\Domain\Payment\Event\PaymentSucceeded;
 use Payroad\Domain\Money\Currency;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\CustomerId;
-use Payroad\Domain\Payment\IdempotencyKey;
-use Payroad\Domain\Payment\MerchantId;
 use Payroad\Domain\Payment\Payment;
+use Payroad\Domain\Payment\PaymentId;
 use Payroad\Domain\Payment\PaymentMetadata;
 use Payroad\Domain\Payment\PaymentStatus;
-use Payroad\Domain\Attempt\AttemptId;
+use Payroad\Domain\Attempt\PaymentAttemptId;
 use PHPUnit\Framework\TestCase;
 
 final class PaymentTest extends TestCase
 {
     private Money $amount;
-    private MerchantId $merchantId;
     private CustomerId $customerId;
-    private IdempotencyKey $idempotencyKey;
 
     protected function setUp(): void
     {
-        $this->amount         = Money::ofMinor(1000, Currency::of('USD'));
-        $this->merchantId     = MerchantId::of('merchant-1');
-        $this->customerId     = CustomerId::of('customer-1');
-        $this->idempotencyKey = IdempotencyKey::of('idem-key-1');
+        $this->amount     = Money::ofMinor(1000, new Currency('USD', 2));
+        $this->customerId = CustomerId::of('customer-1');
     }
 
     private function createPayment(?DateTimeImmutable $expiresAt = null): Payment
     {
         return Payment::create(
+            PaymentId::generate(),
             $this->amount,
-            $this->merchantId,
             $this->customerId,
-            $this->idempotencyKey,
             new PaymentMetadata(),
             $expiresAt
         );
@@ -60,10 +56,9 @@ final class PaymentTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         Payment::create(
-            Money::ofMinor(0, Currency::of('USD')),
-            $this->merchantId,
+            PaymentId::generate(),
+            Money::ofMinor(0, new Currency('USD', 2)),
             $this->customerId,
-            $this->idempotencyKey
         );
     }
 
@@ -80,6 +75,28 @@ final class PaymentTest extends TestCase
 
         $payment->markProcessing();
         $this->assertSame(PaymentStatus::PROCESSING, $payment->getStatus());
+    }
+
+    public function testMarkProcessingRecordsPaymentProcessingStartedEvent(): void
+    {
+        $payment = $this->createPayment();
+        $payment->releaseEvents();
+
+        $payment->markProcessing();
+        $events = $payment->releaseEvents();
+
+        $this->assertCount(1, $events);
+        $this->assertInstanceOf(PaymentProcessingStarted::class, $events[0]);
+    }
+
+    public function testMarkProcessingDoesNotRecordEventWhenNotPending(): void
+    {
+        $payment = $this->createPayment();
+        $payment->markProcessing();
+        $payment->releaseEvents();
+
+        $payment->markProcessing(); // already PROCESSING — must be no-op
+        $this->assertEmpty($payment->releaseEvents());
     }
 
     public function testMarkProcessingIsIdempotentOnSecondCall(): void
@@ -107,7 +124,7 @@ final class PaymentTest extends TestCase
     {
         $payment   = $this->createPayment();
         $payment->releaseEvents();
-        $attemptId = AttemptId::generate();
+        $attemptId = PaymentAttemptId::generate();
 
         $payment->markSucceeded($attemptId);
 
@@ -119,13 +136,13 @@ final class PaymentTest extends TestCase
     {
         $payment   = $this->createPayment();
         $payment->releaseEvents();
-        $attemptId = AttemptId::generate();
+        $attemptId = PaymentAttemptId::generate();
 
         $payment->markSucceeded($attemptId);
         $payment->releaseEvents();
 
         // Should not throw, should be a no-op
-        $payment->markSucceeded(AttemptId::generate());
+        $payment->markSucceeded(PaymentAttemptId::generate());
         $this->assertSame(PaymentStatus::SUCCEEDED, $payment->getStatus());
     }
 
@@ -133,7 +150,7 @@ final class PaymentTest extends TestCase
     {
         $payment   = $this->createPayment();
         $payment->releaseEvents();
-        $attemptId = AttemptId::generate();
+        $attemptId = PaymentAttemptId::generate();
 
         $payment->markSucceeded($attemptId);
         $events = $payment->releaseEvents();
@@ -151,6 +168,30 @@ final class PaymentTest extends TestCase
         $this->assertSame(PaymentStatus::FAILED, $payment->getStatus());
     }
 
+    public function testMarkFailedRecordsPaymentFailedEvent(): void
+    {
+        $payment = $this->createPayment();
+        $payment->releaseEvents();
+
+        $payment->markFailed();
+        $events = $payment->releaseEvents();
+
+        $this->assertCount(1, $events);
+        $this->assertInstanceOf(PaymentFailed::class, $events[0]);
+    }
+
+    public function testMarkFailedIsNoOpWhenAlreadyTerminal(): void
+    {
+        $payment = $this->createPayment();
+        $payment->markSucceeded(PaymentAttemptId::generate());
+        $payment->releaseEvents();
+
+        $payment->markFailed();
+
+        $this->assertSame(PaymentStatus::SUCCEEDED, $payment->getStatus());
+        $this->assertEmpty($payment->releaseEvents());
+    }
+
     public function testCancelSetsStatusCanceledAndRecordsPaymentCanceledEvent(): void
     {
         $payment = $this->createPayment();
@@ -164,15 +205,18 @@ final class PaymentTest extends TestCase
         $this->assertInstanceOf(PaymentCanceled::class, $events[0]);
     }
 
-    public function testCancelThrowsLogicExceptionWhenAlreadyTerminal(): void
+    public function testCancelIsNoOpWhenAlreadyTerminal(): void
     {
         $payment = $this->createPayment();
         $payment->releaseEvents();
-        $payment->markSucceeded(AttemptId::generate());
+        $payment->markSucceeded(PaymentAttemptId::generate());
         $payment->releaseEvents();
 
-        $this->expectException(LogicException::class);
+        // cancel() on a terminal payment is a silent no-op — consistent with expire() and markFailed()
         $payment->cancel();
+
+        $this->assertSame(PaymentStatus::SUCCEEDED, $payment->getStatus());
+        $this->assertEmpty($payment->releaseEvents());
     }
 
     public function testExpireSetsStatusExpiredAndRecordsPaymentExpiredEvent(): void
@@ -236,5 +280,68 @@ final class PaymentTest extends TestCase
     {
         $payment = $this->createPayment();
         $this->assertSame(0, $payment->getVersion());
+    }
+
+    public function testIncrementVersionIncrementsOnEachCall(): void
+    {
+        $payment = $this->createPayment();
+
+        $payment->incrementVersion();
+        $this->assertSame(1, $payment->getVersion());
+
+        $payment->incrementVersion();
+        $this->assertSame(2, $payment->getVersion());
+    }
+
+    public function testMarkRetryableMovesProcessingBackToPending(): void
+    {
+        $payment = $this->createPayment();
+        $payment->markProcessing();
+
+        $payment->markRetryable();
+
+        $this->assertSame(PaymentStatus::PENDING, $payment->getStatus());
+    }
+
+    public function testMarkRetryableRecordsPaymentRetryAvailableEvent(): void
+    {
+        $payment = $this->createPayment();
+        $payment->markProcessing();
+        $payment->releaseEvents();
+
+        $payment->markRetryable();
+        $events = $payment->releaseEvents();
+
+        $this->assertCount(1, $events);
+        $this->assertInstanceOf(PaymentRetryAvailable::class, $events[0]);
+    }
+
+    public function testMarkRetryableIsNoOpWhenNotProcessing(): void
+    {
+        $payment = $this->createPayment();
+        $payment->releaseEvents();
+
+        $payment->markRetryable(); // already PENDING — must be no-op
+        $this->assertSame(PaymentStatus::PENDING, $payment->getStatus());
+        $this->assertEmpty($payment->releaseEvents());
+    }
+
+    public function testMarkRetryableIsNoOpWhenAlreadyPending(): void
+    {
+        $payment = $this->createPayment();
+
+        $payment->markRetryable();
+
+        $this->assertSame(PaymentStatus::PENDING, $payment->getStatus());
+    }
+
+    public function testMarkRetryableIsNoOpWhenTerminal(): void
+    {
+        $payment = $this->createPayment();
+        $payment->markSucceeded(PaymentAttemptId::generate());
+
+        $payment->markRetryable();
+
+        $this->assertSame(PaymentStatus::SUCCEEDED, $payment->getStatus());
     }
 }

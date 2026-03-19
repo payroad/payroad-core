@@ -1,12 +1,12 @@
 {
-  "name": "payroad/payment-core",
+  "name": "payroad/payroad-core",
   "description": "Payment domain core — aggregates, ports, and application use cases for Payroad",
   "type": "library",
   "license": "MIT",
-  "homepage": "https://github.com/payroad/payment-core",
+  "homepage": "https://github.com/payroad/payroad-core",
   "support": {
-    "source": "https://github.com/payroad/payment-core",
-    "issues": "https://github.com/payroad/payment-core/issues"
+    "source": "https://github.com/payroad/payroad-core",
+    "issues": "https://github.com/payroad/payroad-core/issues"
   },
   "require": {
     "php": "^8.2",

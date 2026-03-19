@@ -2,19 +2,18 @@
 
 namespace Tests\Domain\Attempt\StateMachine;
 
+use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStatus;
-use Payroad\Domain\Attempt\PaymentAttempt;
-use Payroad\Domain\Attempt\StateMachine\CryptoStateMachine;
-use Payroad\Domain\Exception\InvalidTransitionException;
+use Payroad\Domain\PaymentFlow\Crypto\CryptoPaymentAttempt;
+use Payroad\Domain\PaymentFlow\Crypto\CryptoStateMachine;
+use Payroad\Domain\Attempt\Exception\InvalidTransitionException;
 use Payroad\Domain\Money\Currency;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\CustomerId;
-use Payroad\Domain\Payment\IdempotencyKey;
-use Payroad\Domain\Payment\MerchantId;
 use Payroad\Domain\Payment\Payment;
+use Payroad\Domain\Payment\PaymentId;
 use Payroad\Domain\Payment\PaymentMetadata;
-use Payroad\Domain\Payment\PaymentMethodType;
-use Tests\Stub\StubSpecificData;
+use Tests\Stub\StubCryptoData;
 use PHPUnit\Framework\TestCase;
 
 final class CryptoStateMachineTest extends TestCase
@@ -26,102 +25,75 @@ final class CryptoStateMachineTest extends TestCase
         $this->sm = new CryptoStateMachine();
     }
 
-    private function makePendingAttempt(): PaymentAttempt
+    private function makeAttempt(): CryptoPaymentAttempt
     {
         $payment = Payment::create(
-            Money::ofMinor(1000, Currency::of('USD')),
-            MerchantId::of('merchant-1'),
+            PaymentId::generate(),
+            Money::ofMinor(1000, new Currency('USD', 2)),
             CustomerId::of('customer-1'),
-            IdempotencyKey::of('idem-key-' . uniqid()),
             new PaymentMetadata()
         );
 
-        return PaymentAttempt::create(
-            $payment->getId(),
-            PaymentMethodType::CRYPTO,
-            'stub',
-            new StubSpecificData()
-        );
-    }
-
-    private function makeProcessingAttempt(): PaymentAttempt
-    {
-        $attempt = $this->makePendingAttempt();
-        $attempt->transitionTo(AttemptStatus::PROCESSING, 'processing');
-        return $attempt;
-    }
-
-    private function makeSucceededAttempt(): PaymentAttempt
-    {
-        $attempt = $this->makeProcessingAttempt();
-        $attempt->transitionTo(AttemptStatus::SUCCEEDED, 'succeeded');
-        return $attempt;
+        return CryptoPaymentAttempt::create(PaymentAttemptId::generate(), $payment->getId(), 'stub', new StubCryptoData());
     }
 
     // ── PENDING transitions ───────────────────────────────────────────────────
 
     public function testPendingToProcessingIsAllowed(): void
     {
-        $attempt = $this->makePendingAttempt();
-        $this->assertTrue($this->sm->canTransition($attempt, AttemptStatus::PROCESSING));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::PROCESSING));
     }
 
     public function testPendingToFailedIsAllowed(): void
     {
-        $attempt = $this->makePendingAttempt();
-        $this->assertTrue($this->sm->canTransition($attempt, AttemptStatus::FAILED));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::FAILED));
     }
 
     public function testPendingToSucceededIsNotAllowed(): void
     {
-        $attempt = $this->makePendingAttempt();
-        $this->assertFalse($this->sm->canTransition($attempt, AttemptStatus::SUCCEEDED));
+        $this->assertFalse($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::SUCCEEDED));
     }
 
     // ── PROCESSING transitions ────────────────────────────────────────────────
 
     public function testProcessingToSucceededIsAllowed(): void
     {
-        $attempt = $this->makeProcessingAttempt();
-        $this->assertTrue($this->sm->canTransition($attempt, AttemptStatus::SUCCEEDED));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::PROCESSING, AttemptStatus::SUCCEEDED));
     }
 
     public function testProcessingToFailedIsAllowed(): void
     {
-        $attempt = $this->makeProcessingAttempt();
-        $this->assertTrue($this->sm->canTransition($attempt, AttemptStatus::FAILED));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::PROCESSING, AttemptStatus::FAILED));
     }
 
     public function testProcessingToExpiredIsAllowed(): void
     {
-        $attempt = $this->makeProcessingAttempt();
-        $this->assertTrue($this->sm->canTransition($attempt, AttemptStatus::EXPIRED));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::PROCESSING, AttemptStatus::EXPIRED));
     }
 
     // ── Terminal status transitions ───────────────────────────────────────────
 
     public function testSucceededToFailedIsNotAllowed(): void
     {
-        $attempt = $this->makeSucceededAttempt();
-        $this->assertFalse($this->sm->canTransition($attempt, AttemptStatus::FAILED));
+        $this->assertFalse($this->sm->canTransition(AttemptStatus::SUCCEEDED, AttemptStatus::FAILED));
     }
 
-    // ── applyTransition ───────────────────────────────────────────────────────
+    // ── applyTransition on the attempt ───────────────────────────────────────
 
-    public function testApplyTransitionThrowsInvalidTransitionExceptionOnInvalid(): void
+    public function testApplyTransitionOnAttemptThrowsOnInvalidTransition(): void
     {
-        $attempt = $this->makePendingAttempt();
+        $attempt = $this->makeAttempt();
 
         $this->expectException(InvalidTransitionException::class);
-        $this->sm->applyTransition($attempt, AttemptStatus::SUCCEEDED, 'succeeded');
+        $attempt->applyTransition(AttemptStatus::SUCCEEDED, 'succeeded');
     }
 
-    public function testApplyTransitionAppliesValidTransition(): void
+    public function testApplyTransitionOnAttemptAppliesValidTransition(): void
     {
-        $attempt = $this->makePendingAttempt();
+        $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $this->sm->applyTransition($attempt, AttemptStatus::PROCESSING, 'processing');
+        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
 
         $this->assertSame(AttemptStatus::PROCESSING, $attempt->getStatus());
     }

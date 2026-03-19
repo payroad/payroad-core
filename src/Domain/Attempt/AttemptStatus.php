@@ -7,6 +7,9 @@ enum AttemptStatus: string
     /** Just created, provider not yet called. */
     case PENDING               = 'pending';
 
+    /** Funds reserved by the provider; awaiting explicit capture. */
+    case AUTHORIZED            = 'authorized';
+
     /** Waiting for user action: 3DS, bank redirect, transfer, cash deposit. */
     case AWAITING_CONFIRMATION = 'awaiting_confirmation';
 
@@ -37,5 +40,10 @@ enum AttemptStatus: string
             self::FAILED, self::CANCELED, self::EXPIRED => true,
             default => false,
         };
+    }
+
+    public function isAuthorized(): bool
+    {
+        return $this === self::AUTHORIZED;
     }
 }
