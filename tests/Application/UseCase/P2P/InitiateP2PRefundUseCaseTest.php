@@ -189,6 +189,10 @@ final class InitiateP2PRefundUseCaseTest extends TestCase
                 $this->isInstanceOf(Money::class),
                 $this->isType('string'),
                 $this->equalTo($context),
+            )
+            ->willReturnCallback(
+                fn(RefundId $id, PaymentId $paymentId, PaymentAttemptId $attemptId, string $providerName, Money $amount) =>
+                    P2PRefund::create($id, $paymentId, $attemptId, $providerName, $amount, new StubP2PRefundData())
             );
 
         $this->useCase->execute(new InitiateP2PRefundCommand(

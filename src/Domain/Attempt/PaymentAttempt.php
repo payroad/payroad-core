@@ -16,6 +16,7 @@ use Payroad\Domain\Attempt\Event\AttemptSucceeded;
 use Payroad\Domain\Attempt\Exception\InvalidTransitionException;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
+use Payroad\Domain\PaymentMethodType;
 
 /**
  * Abstract base aggregate for all payment attempt types.

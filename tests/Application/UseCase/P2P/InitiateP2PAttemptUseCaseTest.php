@@ -5,6 +5,7 @@ namespace Tests\Application\UseCase\P2P;
 use DateTimeImmutable;
 use DomainException;
 use Payroad\Application\Exception\ActiveAttemptExistsException;
+use Payroad\Application\Exception\PaymentExpiredException;
 use Payroad\Application\Exception\PaymentNotFoundException;
 use Payroad\Application\UseCase\P2P\InitiateP2PAttemptCommand;
 use Payroad\Application\UseCase\P2P\InitiateP2PAttemptUseCase;
@@ -55,7 +56,6 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
 
         $this->providers->method('forP2P')->willReturn($this->p2pProvider);
         $this->attempts->method('nextId')->willReturn(PaymentAttemptId::generate());
-        $this->attempts->method('findByPaymentId')->willReturn([]);
 
         $this->useCase = new InitiateP2PAttemptUseCase(
             new AttemptInitiationGuard($this->payments, $this->attempts),
@@ -91,6 +91,7 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
     public function testExecuteReturnsP2PPaymentAttempt(): void
     {
         $payment = $this->makePayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $result = $this->useCase->execute($this->makeCommand($payment));
@@ -104,6 +105,7 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
         $context = new P2PAttemptContext('Jane Smith', 'DEUTDEDB');
         $command = new InitiateP2PAttemptCommand($payment->getId(), 'stub', $context);
 
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->p2pProvider
@@ -115,6 +117,10 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
                 'stub',
                 $this->isInstanceOf(Money::class),
                 $this->equalTo($context),
+            )
+            ->willReturnCallback(
+                fn(PaymentAttemptId $id, PaymentId $paymentId, string $providerName, Money $amount) =>
+                    P2PPaymentAttempt::create($id, $paymentId, 'stub', $amount, new StubP2PData())
             );
 
         $this->useCase->execute($command);
@@ -123,6 +129,7 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
     public function testExecuteMarksPaymentAsProcessing(): void
     {
         $payment = $this->makePayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->useCase->execute($this->makeCommand($payment));
@@ -133,6 +140,7 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
     public function testExecuteSavesAttempt(): void
     {
         $payment = $this->makePayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->attempts
@@ -159,7 +167,7 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
         $payment = $this->makePayment(new DateTimeImmutable('-1 hour'));
         $this->payments->method('findById')->willReturn($payment);
 
-        $this->expectException(DomainException::class);
+        $this->expectException(PaymentExpiredException::class);
         $this->useCase->execute($this->makeCommand($payment));
     }
 

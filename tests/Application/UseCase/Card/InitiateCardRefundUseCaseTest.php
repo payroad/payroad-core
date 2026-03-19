@@ -189,6 +189,10 @@ final class InitiateCardRefundUseCaseTest extends TestCase
                 $this->isInstanceOf(Money::class),
                 $this->isType('string'),
                 $this->equalTo($context),
+            )
+            ->willReturnCallback(
+                fn(RefundId $id, PaymentId $paymentId, PaymentAttemptId $attemptId, string $providerName, Money $amount) =>
+                    CardRefund::create($id, $paymentId, $attemptId, $providerName, $amount, new StubCardRefundData())
             );
 
         $this->useCase->execute(new InitiateCardRefundCommand(

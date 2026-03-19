@@ -34,7 +34,7 @@ final class CryptoStateMachineTest extends TestCase
             new PaymentMetadata()
         );
 
-        return CryptoPaymentAttempt::create(PaymentAttemptId::generate(), $payment->getId(), 'stub', new StubCryptoData());
+        return CryptoPaymentAttempt::create(PaymentAttemptId::generate(), $payment->getId(), 'stub', Money::ofMinor(1000, new Currency('USD', 2)), new StubCryptoData());
     }
 
     // ── PENDING transitions ───────────────────────────────────────────────────

@@ -185,7 +185,7 @@ Each attempt subclass validates transitions before applying them:
 ```
 Card:    PENDING → AWAITING_CONFIRMATION → AUTHORIZED → PROCESSING → SUCCEEDED
                  └──────────────────────→             └→ FAILED
-                                                       └→ CANCELED
+                                                       └→ EXPIRED
 
 Crypto:  PENDING → PROCESSING → SUCCEEDED | FAILED | EXPIRED
 
@@ -286,15 +286,19 @@ Register the provider in your `ProviderRegistryInterface` implementation. No cha
 
 ## Testing
 
+With Docker (no local PHP required):
+
+```bash
+make test                                    # run all tests
+make filter FILTER=testPaymentMarkedSucceeded # run a single test
+make shell                                   # open a shell inside the container
+```
+
+Without Docker:
+
 ```bash
 composer install
 vendor/bin/phpunit
-```
-
-Run a single test class or method:
-
-```bash
-vendor/bin/phpunit tests/Domain/Attempt/PaymentAttemptTest.php
 vendor/bin/phpunit --filter testPaymentMarkedSucceededOnSyncCapture
 ```
 

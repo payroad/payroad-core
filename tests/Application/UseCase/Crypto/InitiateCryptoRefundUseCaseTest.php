@@ -198,6 +198,10 @@ final class InitiateCryptoRefundUseCaseTest extends TestCase
                 $this->isInstanceOf(Money::class),
                 $this->isType('string'),
                 $this->equalTo($context),
+            )
+            ->willReturnCallback(
+                fn(RefundId $id, PaymentId $paymentId, PaymentAttemptId $attemptId, string $providerName, Money $amount) =>
+                    CryptoRefund::create($id, $paymentId, $attemptId, $providerName, $amount, new StubCryptoRefundData())
             );
 
         $this->useCase->execute(new InitiateCryptoRefundCommand(

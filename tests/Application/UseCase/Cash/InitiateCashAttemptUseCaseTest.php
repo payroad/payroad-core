@@ -5,6 +5,7 @@ namespace Tests\Application\UseCase\Cash;
 use DateTimeImmutable;
 use DomainException;
 use Payroad\Application\Exception\ActiveAttemptExistsException;
+use Payroad\Application\Exception\PaymentExpiredException;
 use Payroad\Application\Exception\PaymentNotFoundException;
 use Payroad\Application\UseCase\Cash\InitiateCashAttemptCommand;
 use Payroad\Application\UseCase\Cash\InitiateCashAttemptUseCase;
@@ -55,7 +56,6 @@ final class InitiateCashAttemptUseCaseTest extends TestCase
 
         $this->providers->method('forCash')->willReturn($this->cashProvider);
         $this->attempts->method('nextId')->willReturn(PaymentAttemptId::generate());
-        $this->attempts->method('findByPaymentId')->willReturn([]);
 
         $this->useCase = new InitiateCashAttemptUseCase(
             new AttemptInitiationGuard($this->payments, $this->attempts),
@@ -91,6 +91,7 @@ final class InitiateCashAttemptUseCaseTest extends TestCase
     public function testExecuteReturnsCashPaymentAttempt(): void
     {
         $payment = $this->makePayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $result = $this->useCase->execute($this->makeCommand($payment));
@@ -104,6 +105,7 @@ final class InitiateCashAttemptUseCaseTest extends TestCase
         $context = new CashAttemptContext('+525512345678', 'customer@example.com', 'oxxo');
         $command = new InitiateCashAttemptCommand($payment->getId(), 'stub', $context);
 
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->cashProvider
@@ -115,6 +117,10 @@ final class InitiateCashAttemptUseCaseTest extends TestCase
                 'stub',
                 $this->isInstanceOf(Money::class),
                 $this->equalTo($context),
+            )
+            ->willReturnCallback(
+                fn(PaymentAttemptId $id, PaymentId $paymentId, string $providerName, Money $amount) =>
+                    CashPaymentAttempt::create($id, $paymentId, 'stub', $amount, new StubCashData())
             );
 
         $this->useCase->execute($command);
@@ -123,6 +129,7 @@ final class InitiateCashAttemptUseCaseTest extends TestCase
     public function testExecuteMarksPaymentAsProcessing(): void
     {
         $payment = $this->makePayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->useCase->execute($this->makeCommand($payment));
@@ -133,6 +140,7 @@ final class InitiateCashAttemptUseCaseTest extends TestCase
     public function testExecuteSavesAttempt(): void
     {
         $payment = $this->makePayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->attempts
@@ -159,7 +167,7 @@ final class InitiateCashAttemptUseCaseTest extends TestCase
         $payment = $this->makePayment(new DateTimeImmutable('-1 hour'));
         $this->payments->method('findById')->willReturn($payment);
 
-        $this->expectException(DomainException::class);
+        $this->expectException(PaymentExpiredException::class);
         $this->useCase->execute($this->makeCommand($payment));
     }
 

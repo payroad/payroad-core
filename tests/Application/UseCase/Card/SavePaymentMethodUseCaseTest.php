@@ -65,6 +65,7 @@ final class SavePaymentMethodUseCaseTest extends TestCase
             new StubSpecificData(),
         );
         $attempt->setProviderReference('ref-abc123');
+        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
         $attempt->applyTransition(AttemptStatus::SUCCEEDED, 'succeeded');
         $attempt->releaseEvents();
         return $attempt;
@@ -211,6 +212,7 @@ final class SavePaymentMethodUseCaseTest extends TestCase
             Money::ofMinor(1000, new Currency('USD', 2)),
             new StubSpecificData(),
         );
+        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
         $attempt->applyTransition(AttemptStatus::SUCCEEDED, 'succeeded');
         $attempt->releaseEvents();
 

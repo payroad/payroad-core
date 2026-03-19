@@ -35,7 +35,7 @@ final class CardStateMachineAuthorizeTest extends TestCase
             new PaymentMetadata()
         );
 
-        return CardPaymentAttempt::create(PaymentAttemptId::generate(), $payment->getId(), 'stub', new StubSpecificData());
+        return CardPaymentAttempt::create(PaymentAttemptId::generate(), $payment->getId(), 'stub', Money::ofMinor(1000, new Currency('USD', 2)), new StubSpecificData());
     }
 
     // ── PENDING → AUTHORIZED ─────────────────────────────────────────────────

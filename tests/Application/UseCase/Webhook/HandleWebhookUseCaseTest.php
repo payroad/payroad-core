@@ -290,9 +290,8 @@ final class HandleWebhookUseCaseTest extends TestCase
     public static function failureStatusProvider(): array
     {
         return [
-            'failed'   => [AttemptStatus::FAILED],
-            'canceled' => [AttemptStatus::CANCELED],
-            'expired'  => [AttemptStatus::EXPIRED],
+            'failed'  => [AttemptStatus::FAILED],
+            'expired' => [AttemptStatus::EXPIRED],
         ];
     }
 

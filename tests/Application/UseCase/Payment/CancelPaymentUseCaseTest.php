@@ -34,9 +34,6 @@ final class CancelPaymentUseCaseTest extends TestCase
         $this->attempts   = $this->createMock(PaymentAttemptRepositoryInterface::class);
         $this->dispatcher = $this->createMock(DomainEventDispatcherInterface::class);
 
-        // Default: no active attempts — tests that don't care about this guard pass through.
-        $this->attempts->method('findByPaymentId')->willReturn([]);
-
         $this->useCase = new CancelPaymentUseCase($this->payments, $this->attempts, $this->dispatcher);
     }
 
@@ -55,6 +52,7 @@ final class CancelPaymentUseCaseTest extends TestCase
     public function testExecuteCancelsPayment(): void
     {
         $payment = $this->makePendingPayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->useCase->execute(new CancelPaymentCommand($payment->getId()));
@@ -65,6 +63,7 @@ final class CancelPaymentUseCaseTest extends TestCase
     public function testExecuteSavesPayment(): void
     {
         $payment = $this->makePendingPayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->payments->expects($this->once())->method('save')->with($payment);
@@ -75,6 +74,7 @@ final class CancelPaymentUseCaseTest extends TestCase
     public function testExecuteDispatchesEvents(): void
     {
         $payment = $this->makePendingPayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->dispatcher->expects($this->once())->method('dispatch');
@@ -95,6 +95,7 @@ final class CancelPaymentUseCaseTest extends TestCase
         $payment = $this->makePendingPayment();
         $payment->cancel();
         $payment->releaseEvents();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->payments->expects($this->never())->method('save');
@@ -111,6 +112,7 @@ final class CancelPaymentUseCaseTest extends TestCase
         $payment->markProcessing();
         $payment->markSucceeded(PaymentAttemptId::generate());
         $payment->releaseEvents();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->payments->expects($this->never())->method('save');

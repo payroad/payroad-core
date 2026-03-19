@@ -55,6 +55,7 @@ final class CardStateMachine implements AttemptStateMachineInterface
             AttemptStatus::PROCESSING => in_array($to, [
                 AttemptStatus::SUCCEEDED,
                 AttemptStatus::FAILED,
+                AttemptStatus::EXPIRED,
             ], true),
 
             default => false,

@@ -12,6 +12,7 @@ use Payroad\Domain\Refund\Event\RefundFailed;
 use Payroad\Domain\Refund\Event\RefundStatusChanged;
 use Payroad\Domain\Refund\Event\RefundSucceeded;
 use Payroad\Domain\Refund\Exception\InvalidRefundTransitionException;
+use Payroad\Port\Provider\RefundData;
 
 /**
  * Abstract base aggregate for all refund types.

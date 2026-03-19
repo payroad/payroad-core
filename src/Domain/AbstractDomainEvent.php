@@ -10,10 +10,10 @@ use Ramsey\Uuid\Uuid;
  * Generates a unique eventId (UUID v4) and captures occurredOn automatically.
  * Subclasses declare only their payload properties and call parent::__construct().
  */
-abstract class AbstractDomainEvent implements DomainEvent
+abstract readonly class AbstractDomainEvent implements DomainEvent
 {
-    public readonly string $eventId;
-    public readonly DateTimeImmutable $occurredOn;
+    public string $eventId;
+    public DateTimeImmutable $occurredOn;
 
     protected function __construct()
     {

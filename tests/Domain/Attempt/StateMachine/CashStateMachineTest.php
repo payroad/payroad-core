@@ -34,7 +34,7 @@ final class CashStateMachineTest extends TestCase
             new PaymentMetadata()
         );
 
-        return CashPaymentAttempt::create(PaymentAttemptId::generate(), $payment->getId(), 'stub', new StubCashData());
+        return CashPaymentAttempt::create(PaymentAttemptId::generate(), $payment->getId(), 'stub', Money::ofMinor(1000, new Currency('USD', 2)), new StubCashData());
     }
 
     // ── PENDING transitions ───────────────────────────────────────────────────

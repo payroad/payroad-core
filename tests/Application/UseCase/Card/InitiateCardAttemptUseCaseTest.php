@@ -5,6 +5,7 @@ namespace Tests\Application\UseCase\Card;
 use DateTimeImmutable;
 use DomainException;
 use Payroad\Application\Exception\ActiveAttemptExistsException;
+use Payroad\Application\Exception\PaymentExpiredException;
 use Payroad\Application\Exception\PaymentNotFoundException;
 use Payroad\Application\UseCase\Card\InitiateCardAttemptCommand;
 use Payroad\Application\UseCase\Card\InitiateCardAttemptUseCase;
@@ -56,7 +57,6 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
 
         $this->providers->method('forCard')->willReturn($this->cardProvider);
         $this->attempts->method('nextId')->willReturn(PaymentAttemptId::generate());
-        $this->attempts->method('findByPaymentId')->willReturn([]);
 
         $this->useCase = new InitiateCardAttemptUseCase(
             new AttemptInitiationGuard($this->payments, $this->attempts),
@@ -92,6 +92,7 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
     public function testExecuteReturnsCardPaymentAttempt(): void
     {
         $payment = $this->makePayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $result = $this->useCase->execute($this->makeCommand($payment));
@@ -105,6 +106,7 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
         $context = new CardAttemptContext('1.2.3.4', 'Mozilla/5.0', 'US');
         $command = new InitiateCardAttemptCommand($payment->getId(), 'stub', $context);
 
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->cardProvider
@@ -116,6 +118,10 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
                 'stub',
                 $this->isInstanceOf(Money::class),
                 $this->equalTo($context),
+            )
+            ->willReturnCallback(
+                fn(PaymentAttemptId $id, PaymentId $paymentId, string $providerName, Money $amount) =>
+                    CardPaymentAttempt::create($id, $paymentId, 'stub', $amount, new StubSpecificData())
             );
 
         $this->useCase->execute($command);
@@ -124,6 +130,7 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
     public function testExecuteMarksPaymentAsProcessing(): void
     {
         $payment = $this->makePayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->useCase->execute($this->makeCommand($payment));
@@ -134,6 +141,7 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
     public function testExecuteSavesAttempt(): void
     {
         $payment = $this->makePayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->attempts
@@ -147,6 +155,7 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
     public function testExecuteDispatchesEvents(): void
     {
         $payment = $this->makePayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->dispatcher
@@ -173,7 +182,7 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
         $this->payments->method('findById')->willReturn($payment);
         $this->payments->method('save');
 
-        $this->expectException(DomainException::class);
+        $this->expectException(PaymentExpiredException::class);
         $this->useCase->execute($this->makeCommand($payment));
     }
 

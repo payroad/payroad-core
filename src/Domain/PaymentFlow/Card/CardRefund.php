@@ -9,6 +9,7 @@ use Payroad\Domain\Payment\PaymentId;
 use Payroad\Domain\Refund\Event\RefundInitiated;
 use Payroad\Domain\Refund\Refund;
 use Payroad\Port\Provider\RefundData;
+use Payroad\Port\Provider\Card\CardRefundData;
 use Payroad\Domain\Refund\RefundId;
 use Payroad\Domain\Refund\RefundStateMachineInterface;
 

@@ -5,6 +5,7 @@ namespace Tests\Application\UseCase\Crypto;
 use DateTimeImmutable;
 use DomainException;
 use Payroad\Application\Exception\ActiveAttemptExistsException;
+use Payroad\Application\Exception\PaymentExpiredException;
 use Payroad\Application\Exception\PaymentNotFoundException;
 use Payroad\Application\UseCase\Crypto\InitiateCryptoAttemptCommand;
 use Payroad\Application\UseCase\Crypto\InitiateCryptoAttemptUseCase;
@@ -57,7 +58,6 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
 
         $this->providers->method('forCrypto')->willReturn($this->cryptoProvider);
         $this->attempts->method('nextId')->willReturn(PaymentAttemptId::generate());
-        $this->attempts->method('findByPaymentId')->willReturn([]);
 
         $this->useCase = new InitiateCryptoAttemptUseCase(
             new AttemptInitiationGuard($this->payments, $this->attempts),
@@ -93,6 +93,7 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
     public function testExecuteReturnsCryptoPaymentAttempt(): void
     {
         $payment = $this->makePayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $result = $this->useCase->execute($this->makeCommand($payment));
@@ -106,6 +107,7 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
         $context = new CryptoAttemptContext('erc20', 'memo-123');
         $command = new InitiateCryptoAttemptCommand($payment->getId(), 'stub', $context);
 
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->cryptoProvider
@@ -117,6 +119,10 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
                 'stub',
                 $this->isInstanceOf(Money::class),
                 $this->equalTo($context),
+            )
+            ->willReturnCallback(
+                fn(PaymentAttemptId $id, PaymentId $paymentId, string $providerName, Money $amount) =>
+                    CryptoPaymentAttempt::create($id, $paymentId, 'stub', $amount, new StubCryptoData())
             );
 
         $this->useCase->execute($command);
@@ -125,6 +131,7 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
     public function testExecuteMarksPaymentAsProcessing(): void
     {
         $payment = $this->makePayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->useCase->execute($this->makeCommand($payment));
@@ -135,6 +142,7 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
     public function testExecuteSavesAttempt(): void
     {
         $payment = $this->makePayment();
+        $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->attempts
@@ -161,7 +169,7 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
         $payment = $this->makePayment(new DateTimeImmutable('-1 hour'));
         $this->payments->method('findById')->willReturn($payment);
 
-        $this->expectException(DomainException::class);
+        $this->expectException(PaymentExpiredException::class);
         $this->useCase->execute($this->makeCommand($payment));
     }
 

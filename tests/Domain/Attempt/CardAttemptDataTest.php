@@ -4,6 +4,8 @@ namespace Tests\Domain\Attempt;
 
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStatus;
+use Payroad\Domain\Money\Currency;
+use Payroad\Domain\Money\Money;
 use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
 use Payroad\Domain\Payment\PaymentId;
 use PHPUnit\Framework\TestCase;
@@ -21,6 +23,7 @@ final class CardAttemptDataTest extends TestCase
             PaymentAttemptId::generate(),
             PaymentId::generate(),
             'stub',
+            Money::ofMinor(1000, new Currency('USD', 2)),
             $data ?? new StubSpecificData()
         );
     }
