@@ -2,11 +2,13 @@
 
 namespace Payroad\Domain\PaymentFlow\Crypto;
 
+use DateTimeImmutable;
+use Payroad\Domain\Attempt\AttemptStatus;
+use Payroad\Domain\Attempt\PaymentAttempt;
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStateMachineInterface;
 use Payroad\Domain\Attempt\AttemptData;
 use Payroad\Domain\Attempt\Event\AttemptInitiated;
-use Payroad\Domain\Attempt\PaymentAttempt;
 use Payroad\Domain\PaymentMethodType;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
@@ -16,11 +18,34 @@ final class CryptoPaymentAttempt extends PaymentAttempt
     private CryptoAttemptData  $data;
     private CryptoStateMachine $machine;
 
-    private function __construct(PaymentAttemptId $id, PaymentId $paymentId, string $providerName, Money $amount, CryptoAttemptData $data)
-    {
-        parent::__construct($id, $paymentId, $providerName, $amount);
+    public function __construct(
+        PaymentAttemptId   $id,
+        PaymentId          $paymentId,
+        string             $providerName,
+        Money              $amount,
+        CryptoAttemptData  $data,
+        AttemptStatus      $status            = AttemptStatus::PENDING,
+        string             $providerStatus    = 'pending',
+        ?string            $providerReference = null,
+        ?DateTimeImmutable $createdAt         = null,
+    ) {
+        parent::__construct($id, $paymentId, $providerName, $amount, $status, $providerStatus, $providerReference, $createdAt);
         $this->data    = $data;
         $this->machine = new CryptoStateMachine();
+    }
+
+    /**
+     * Asserts that the given attempt belongs to the crypto flow and returns it typed.
+     * @throws \DomainException if the attempt belongs to a different flow
+     */
+    public static function fromAttempt(PaymentAttempt $attempt): self
+    {
+        if (!$attempt instanceof self) {
+            throw new \DomainException(
+                "Expected crypto attempt, got {$attempt->getMethodType()->value} attempt \"{$attempt->getId()->value}\"."
+            );
+        }
+        return $attempt;
     }
 
     public static function create(

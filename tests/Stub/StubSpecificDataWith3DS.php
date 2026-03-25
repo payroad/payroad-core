@@ -29,6 +29,7 @@ final class StubSpecificDataWith3DS implements CardAttemptData
     public function getCardBrand(): ?string      { return 'visa'; }
     public function getFundingType(): ?string    { return 'credit'; }
     public function getIssuingCountry(): ?string { return 'US'; }
+    public function getClientToken(): ?string    { return null; }
     public function requiresUserAction(): bool   { return true; }
     public function getThreeDSData(): ?ThreeDSData { return $this->threeDSData; }
 }

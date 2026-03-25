@@ -23,5 +23,12 @@ abstract readonly class WebhookResultBase
          * When false, only specificData is updated (e.g. crypto confirmation count increased).
          */
         public bool   $statusChanged = true,
+
+        /**
+         * When set, replaces the attempt's providerReference after the transition.
+         * Used by two-step providers (e.g. Braintree) where the lookup reference
+         * ('bt_{attemptId}') differs from the actual transaction ID needed for refunds.
+         */
+        public ?string $newProviderReference = null,
     ) {}
 }

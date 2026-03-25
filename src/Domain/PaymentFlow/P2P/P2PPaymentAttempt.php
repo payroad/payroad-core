@@ -2,6 +2,8 @@
 
 namespace Payroad\Domain\PaymentFlow\P2P;
 
+use DateTimeImmutable;
+use Payroad\Domain\Attempt\AttemptStatus;
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStateMachineInterface;
 use Payroad\Domain\Attempt\AttemptData;
@@ -16,11 +18,34 @@ final class P2PPaymentAttempt extends PaymentAttempt
     private P2PAttemptData  $data;
     private P2PStateMachine $machine;
 
-    private function __construct(PaymentAttemptId $id, PaymentId $paymentId, string $providerName, Money $amount, P2PAttemptData $data)
-    {
-        parent::__construct($id, $paymentId, $providerName, $amount);
+    public function __construct(
+        PaymentAttemptId   $id,
+        PaymentId          $paymentId,
+        string             $providerName,
+        Money              $amount,
+        P2PAttemptData     $data,
+        AttemptStatus      $status            = AttemptStatus::PENDING,
+        string             $providerStatus    = 'pending',
+        ?string            $providerReference = null,
+        ?DateTimeImmutable $createdAt         = null,
+    ) {
+        parent::__construct($id, $paymentId, $providerName, $amount, $status, $providerStatus, $providerReference, $createdAt);
         $this->data    = $data;
         $this->machine = new P2PStateMachine();
+    }
+
+    /**
+     * Asserts that the given attempt belongs to the P2P flow and returns it typed.
+     * @throws \DomainException if the attempt belongs to a different flow
+     */
+    public static function fromAttempt(PaymentAttempt $attempt): self
+    {
+        if (!$attempt instanceof self) {
+            throw new \DomainException(
+                "Expected P2P attempt, got {$attempt->getMethodType()->value} attempt \"{$attempt->getId()->value}\"."
+            );
+        }
+        return $attempt;
     }
 
     public static function create(

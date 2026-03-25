@@ -66,6 +66,11 @@ final class P2PStateMachineTest extends TestCase
         $this->assertTrue($this->sm->canTransition(AttemptStatus::AWAITING_CONFIRMATION, AttemptStatus::EXPIRED));
     }
 
+    public function testAwaitingConfirmationToCanceledIsAllowed(): void
+    {
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::AWAITING_CONFIRMATION, AttemptStatus::CANCELED));
+    }
+
     // ── PROCESSING transitions ────────────────────────────────────────────────
 
     public function testProcessingToSucceededIsAllowed(): void

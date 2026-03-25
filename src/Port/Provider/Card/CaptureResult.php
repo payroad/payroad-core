@@ -13,6 +13,5 @@ final readonly class CaptureResult
     public function __construct(
         public AttemptStatus $newStatus,
         public string        $providerStatus,
-        public string        $reason = '',
     ) {}
 }

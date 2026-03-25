@@ -2,6 +2,8 @@
 
 namespace Payroad\Domain\PaymentFlow\Cash;
 
+use DateTimeImmutable;
+use Payroad\Domain\Attempt\AttemptStatus;
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStateMachineInterface;
 use Payroad\Domain\Attempt\AttemptData;
@@ -16,11 +18,34 @@ final class CashPaymentAttempt extends PaymentAttempt
     private CashAttemptData  $data;
     private CashStateMachine $machine;
 
-    private function __construct(PaymentAttemptId $id, PaymentId $paymentId, string $providerName, Money $amount, CashAttemptData $data)
-    {
-        parent::__construct($id, $paymentId, $providerName, $amount);
+    public function __construct(
+        PaymentAttemptId   $id,
+        PaymentId          $paymentId,
+        string             $providerName,
+        Money              $amount,
+        CashAttemptData    $data,
+        AttemptStatus      $status            = AttemptStatus::PENDING,
+        string             $providerStatus    = 'pending',
+        ?string            $providerReference = null,
+        ?DateTimeImmutable $createdAt         = null,
+    ) {
+        parent::__construct($id, $paymentId, $providerName, $amount, $status, $providerStatus, $providerReference, $createdAt);
         $this->data    = $data;
         $this->machine = new CashStateMachine();
+    }
+
+    /**
+     * Asserts that the given attempt belongs to the cash flow and returns it typed.
+     * @throws \DomainException if the attempt belongs to a different flow
+     */
+    public static function fromAttempt(PaymentAttempt $attempt): self
+    {
+        if (!$attempt instanceof self) {
+            throw new \DomainException(
+                "Expected cash attempt, got {$attempt->getMethodType()->value} attempt \"{$attempt->getId()->value}\"."
+            );
+        }
+        return $attempt;
     }
 
     public static function create(

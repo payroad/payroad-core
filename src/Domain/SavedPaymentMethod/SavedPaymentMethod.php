@@ -17,17 +17,27 @@ abstract class SavedPaymentMethod
 {
     use AggregateRootTrait;
 
+    private SavedPaymentMethodId     $id;
+    private CustomerId               $customerId;
+    private string                   $providerName;
+    private string                   $providerToken;
     private SavedPaymentMethodStatus $status;
     private DateTimeImmutable        $createdAt;
 
     protected function __construct(
-        private SavedPaymentMethodId $id,
-        private CustomerId           $customerId,
-        private string               $providerName,
-        private string               $providerToken,
+        SavedPaymentMethodId     $id,
+        CustomerId               $customerId,
+        string                   $providerName,
+        string                   $providerToken,
+        SavedPaymentMethodStatus $status    = SavedPaymentMethodStatus::ACTIVE,
+        ?DateTimeImmutable       $createdAt = null,
     ) {
-        $this->status    = SavedPaymentMethodStatus::ACTIVE;
-        $this->createdAt = new DateTimeImmutable();
+        $this->id            = $id;
+        $this->customerId    = $customerId;
+        $this->providerName  = $providerName;
+        $this->providerToken = $providerToken;
+        $this->status        = $status;
+        $this->createdAt     = $createdAt ?? new DateTimeImmutable();
     }
 
     abstract public function getMethodType(): PaymentMethodType;

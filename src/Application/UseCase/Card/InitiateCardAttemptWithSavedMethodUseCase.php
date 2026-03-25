@@ -6,6 +6,7 @@ use Payroad\Application\Exception\SavedPaymentMethodNotFoundException;
 use Payroad\Application\UseCase\Shared\AttemptInitiationGuard;
 use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
+use Payroad\Port\Provider\Card\TokenizingCardProviderInterface;
 use Payroad\Port\Provider\ProviderRegistryInterface;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;
 use Payroad\Port\Repository\PaymentRepositoryInterface;
@@ -36,10 +37,16 @@ final class InitiateCardAttemptWithSavedMethodUseCase
             );
         }
 
+        $provider = $this->providers->forCard($command->providerName);
+
+        if (!$provider instanceof TokenizingCardProviderInterface) {
+            throw new \DomainException(
+                "Provider \"{$command->providerName}\" does not support saved payment methods."
+            );
+        }
+
         $id      = $this->attempts->nextId();
-        $attempt = $this->providers
-            ->forCard($command->providerName)
-            ->initiateAttemptWithSavedMethod(
+        $attempt = $provider->initiateAttemptWithSavedMethod(
                 $id,
                 $payment->getId(),
                 $command->providerName,

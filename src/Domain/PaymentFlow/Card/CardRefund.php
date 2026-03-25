@@ -2,12 +2,14 @@
 
 namespace Payroad\Domain\PaymentFlow\Card;
 
+use DateTimeImmutable;
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\PaymentMethodType;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
 use Payroad\Domain\Refund\Event\RefundInitiated;
 use Payroad\Domain\Refund\Refund;
+use Payroad\Domain\Refund\RefundStatus;
 use Payroad\Port\Provider\RefundData;
 use Payroad\Port\Provider\Card\CardRefundData;
 use Payroad\Domain\Refund\RefundId;
@@ -18,15 +20,19 @@ final class CardRefund extends Refund
     private CardRefundData        $data;
     private CardRefundStateMachine $machine;
 
-    private function __construct(
-        RefundId         $id,
-        PaymentId        $paymentId,
-        PaymentAttemptId $originalAttemptId,
-        string           $providerName,
-        Money            $amount,
-        CardRefundData   $data
+    public function __construct(
+        RefundId           $id,
+        PaymentId          $paymentId,
+        PaymentAttemptId   $originalAttemptId,
+        string             $providerName,
+        Money              $amount,
+        CardRefundData     $data,
+        RefundStatus       $status            = RefundStatus::PENDING,
+        string             $providerStatus    = 'pending',
+        ?string            $providerReference = null,
+        ?DateTimeImmutable $createdAt         = null,
     ) {
-        parent::__construct($id, $paymentId, $originalAttemptId, $providerName, $amount);
+        parent::__construct($id, $paymentId, $originalAttemptId, $providerName, $amount, $status, $providerStatus, $providerReference, $createdAt);
         $this->data    = $data;
         $this->machine = new CardRefundStateMachine();
     }

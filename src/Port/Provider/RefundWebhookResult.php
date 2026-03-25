@@ -6,11 +6,11 @@ use Payroad\Port\Provider\RefundData;
 use Payroad\Domain\Refund\RefundStatus;
 
 /**
- * Returned by PaymentProviderInterface::parseRefundWebhook().
+ * Returned by PaymentProviderInterface::parseIncomingWebhook() for refund events.
  * Decouples the provider from the aggregate — the provider only parses
  * the payload and returns intent; the application service applies it.
  */
-final readonly class RefundWebhookResult extends WebhookResultBase
+final readonly class RefundWebhookResult extends WebhookResultBase implements WebhookEvent
 {
     public function __construct(
         string             $providerReference,

@@ -54,9 +54,10 @@ final class CardStateMachineTest extends TestCase
         $this->assertTrue($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::FAILED));
     }
 
-    public function testPendingToSucceededIsNotAllowed(): void
+    public function testPendingToSucceededIsAllowed(): void
     {
-        $this->assertFalse($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::SUCCEEDED));
+        // Stripe Variant B: provider confirms inline, no intermediate PROCESSING state.
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::SUCCEEDED));
     }
 
     // ── AWAITING_CONFIRMATION transitions ────────────────────────────────────
@@ -123,6 +124,6 @@ final class CardStateMachineTest extends TestCase
         $attempt = $this->makeAttempt();
 
         $this->expectException(InvalidTransitionException::class);
-        $attempt->applyTransition(AttemptStatus::SUCCEEDED, 'succeeded');
+        $attempt->applyTransition(AttemptStatus::EXPIRED, 'expired'); // PENDING → EXPIRED is not allowed
     }
 }

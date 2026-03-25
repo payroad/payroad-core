@@ -42,14 +42,13 @@ final class AttemptInitiationGuard
         $payment = $this->payments->findById($paymentId)
             ?? throw new PaymentNotFoundException($paymentId);
 
-        if ($payment->isExpired()) {
-            throw new PaymentExpiredException($paymentId);
-        }
-
-        if ($payment->getStatus()->isTerminal()) {
-            throw new \DomainException(
-                "Cannot initiate attempt on a terminal payment (status: {$payment->getStatus()->value})."
-            );
+        try {
+            $payment->assertCanInitiateAttempt();
+        } catch (\DomainException $e) {
+            if ($payment->isExpired()) {
+                throw new PaymentExpiredException($paymentId);
+            }
+            throw $e;
         }
 
         return $payment;

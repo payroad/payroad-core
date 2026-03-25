@@ -19,7 +19,13 @@ interface ProviderRegistryInterface
 {
     /**
      * Returns the Card provider for a given providerName.
-     * Supports: initiateCardAttempt, initiateAttemptWithSavedMethod, captureAttempt, voidAttempt, initiateRefund, savePaymentMethod.
+     * Base: initiateCardAttempt, initiateRefund.
+     * Flow type (mutually exclusive, check instanceof to distinguish):
+     *   OneStepCardProviderInterface     — charge confirmed client-side (e.g. Stripe.js); webhook finalises
+     *   TwoStepCardProviderInterface     — chargeWithNonce() called server-side after frontend returns nonce
+     * Optional capabilities (cast + check instanceof before calling):
+     *   CapturableCardProviderInterface  — captureAttempt, voidAttempt
+     *   TokenizingCardProviderInterface  — initiateAttemptWithSavedMethod, savePaymentMethod
      *
      * @throws \Payroad\Application\Exception\ProviderNotFoundException
      */
@@ -27,7 +33,8 @@ interface ProviderRegistryInterface
 
     /**
      * Returns the Crypto provider for a given providerName.
-     * Supports: initiateCryptoAttempt, initiateRefund.
+     * Supports: initiateCryptoAttempt.
+     * For refunds, cast to RefundableCryptoProviderInterface and check instanceof first.
      *
      * @throws \Payroad\Application\Exception\ProviderNotFoundException
      */

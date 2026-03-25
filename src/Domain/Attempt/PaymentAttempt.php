@@ -35,15 +35,24 @@ abstract class PaymentAttempt
     private string            $providerStatus;
     private DateTimeImmutable $createdAt;
 
-    protected function __construct(PaymentAttemptId $id, PaymentId $paymentId, string $providerName, Money $amount)
-    {
-        $this->id             = $id;
-        $this->paymentId      = $paymentId;
-        $this->providerName   = $providerName;
-        $this->amount         = $amount;
-        $this->status         = AttemptStatus::PENDING;
-        $this->providerStatus = 'pending';
-        $this->createdAt      = new DateTimeImmutable();
+    protected function __construct(
+        PaymentAttemptId   $id,
+        PaymentId          $paymentId,
+        string             $providerName,
+        Money              $amount,
+        AttemptStatus      $status            = AttemptStatus::PENDING,
+        string             $providerStatus    = 'pending',
+        ?string            $providerReference = null,
+        ?DateTimeImmutable $createdAt         = null,
+    ) {
+        $this->id                = $id;
+        $this->paymentId         = $paymentId;
+        $this->providerName      = $providerName;
+        $this->amount            = $amount;
+        $this->status            = $status;
+        $this->providerStatus    = $providerStatus;
+        $this->providerReference = $providerReference;
+        $this->createdAt         = $createdAt ?? new DateTimeImmutable();
     }
 
     abstract public function getMethodType(): PaymentMethodType;
@@ -88,6 +97,20 @@ abstract class PaymentAttempt
     public function getProviderName(): string      { return $this->providerName; }
     public function getAmount(): Money             { return $this->amount; }
     public function getProviderReference(): ?string { return $this->providerReference; }
+
+    /**
+     * Returns the provider reference or throws if it has not been set yet.
+     * Use in domain operations that require a confirmed external reference (capture, void, refund).
+     *
+     * @throws \DomainException
+     */
+    public function getRequiredProviderReference(): string
+    {
+        return $this->providerReference
+            ?? throw new \DomainException(
+                "Attempt \"{$this->id->value}\" has no provider reference."
+            );
+    }
     public function getStatus(): AttemptStatus    { return $this->status; }
     public function getProviderStatus(): string   { return $this->providerStatus; }
     public function getCreatedAt(): DateTimeImmutable { return $this->createdAt; }

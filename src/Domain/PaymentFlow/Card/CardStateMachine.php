@@ -8,6 +8,10 @@ use Payroad\Domain\Attempt\AttemptStatus;
 /**
  * State machine for the generic card payment flow.
  *
+ * Immediate charge (Stripe Variant B — no server-side confirm):
+ *   PENDING ──► SUCCEEDED   (provider confirms inline, no intermediate state)
+ *           └──► FAILED
+ *
  * Standard charge:
  *   PENDING ──► PROCESSING ──► SUCCEEDED
  *           └──► FAILED       └──► FAILED
@@ -36,6 +40,7 @@ final class CardStateMachine implements AttemptStateMachineInterface
                 AttemptStatus::AUTHORIZED,
                 AttemptStatus::AWAITING_CONFIRMATION,
                 AttemptStatus::PROCESSING,
+                AttemptStatus::SUCCEEDED,
                 AttemptStatus::FAILED,
             ], true),
 

@@ -15,6 +15,7 @@ final class StubSpecificData implements CardAttemptData
     public function getCardBrand(): ?string      { return 'visa'; }
     public function getFundingType(): ?string    { return 'credit'; }
     public function getIssuingCountry(): ?string { return 'US'; }
+    public function getClientToken(): ?string    { return null; }
     public function requiresUserAction(): bool   { return false; }
     public function getThreeDSData(): ?ThreeDSData { return null; }
 }

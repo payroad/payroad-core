@@ -4,13 +4,16 @@ namespace Payroad\Port\Provider\Crypto;
 
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\PaymentFlow\Crypto\CryptoPaymentAttempt;
-use Payroad\Domain\PaymentFlow\Crypto\CryptoRefund;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
-use Payroad\Domain\Refund\RefundId;
-use Payroad\Port\Provider\Crypto\CryptoRefundContext;
 use Payroad\Port\Provider\PaymentProviderInterface;
 
+/**
+ * Base interface for all crypto payment providers.
+ *
+ * Programmatic refund support is optional — providers that support it
+ * also implement RefundableCryptoProviderInterface.
+ */
 interface CryptoProviderInterface extends PaymentProviderInterface
 {
     /**
@@ -24,14 +27,4 @@ interface CryptoProviderInterface extends PaymentProviderInterface
         Money                $amount,
         CryptoAttemptContext $context
     ): CryptoPaymentAttempt;
-
-    public function initiateRefund(
-        RefundId            $id,
-        PaymentId           $paymentId,
-        PaymentAttemptId    $originalAttemptId,
-        string              $providerName,
-        Money               $amount,
-        string              $originalProviderReference,
-        CryptoRefundContext $context
-    ): CryptoRefund;
 }

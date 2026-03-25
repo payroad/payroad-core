@@ -7,21 +7,18 @@ use Payroad\Application\Exception\RefundNotFoundException;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
 use Payroad\Port\Repository\PaymentRepositoryInterface;
 use Payroad\Port\Repository\RefundRepositoryInterface;
-use Payroad\Port\Provider\ProviderRegistryInterface;
 
 final class HandleRefundWebhookUseCase
 {
     public function __construct(
         private PaymentRepositoryInterface     $payments,
         private RefundRepositoryInterface      $refunds,
-        private ProviderRegistryInterface      $providers,
         private DomainEventDispatcherInterface $dispatcher
     ) {}
 
     public function execute(HandleRefundWebhookCommand $command): void
     {
-        $provider = $this->providers->getByName($command->providerName);
-        $result   = $provider->parseRefundWebhook($command->payload, $command->headers);
+        $result = $command->result;
 
         $refund = $this->refunds->findByProviderReference($command->providerName, $result->providerReference)
             ?? throw new RefundNotFoundException($result->providerReference);

@@ -9,8 +9,9 @@ use Payroad\Domain\Attempt\AttemptStatus;
  * State machine for the generic P2P (bank transfer) payment flow.
  *
  * PENDING ──► AWAITING_CONFIRMATION ──► PROCESSING ──► SUCCEEDED
- *         └──► FAILED               └──► FAILED
+ *         └──► FAILED               └──► FAILED       └──► FAILED
  *                                   └──► EXPIRED
+ *                                   └──► CANCELED
  */
 final class P2PStateMachine implements AttemptStateMachineInterface
 {
@@ -30,6 +31,7 @@ final class P2PStateMachine implements AttemptStateMachineInterface
                 AttemptStatus::PROCESSING,
                 AttemptStatus::FAILED,
                 AttemptStatus::EXPIRED,
+                AttemptStatus::CANCELED,
             ], true),
 
             AttemptStatus::PROCESSING => in_array($to, [

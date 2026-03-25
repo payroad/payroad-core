@@ -36,21 +36,26 @@ final class Payment
     private ?DateTimeImmutable  $expiresAt;
     private Money               $refundedAmount;
 
-    private function __construct(
-        PaymentId       $id,
-        Money           $amount,
-        CustomerId      $customerId,
-        PaymentMetadata $metadata,
-        ?DateTimeImmutable $expiresAt
+    public function __construct(
+        PaymentId          $id,
+        Money              $amount,
+        CustomerId         $customerId,
+        PaymentMetadata    $metadata            = new PaymentMetadata(),
+        ?DateTimeImmutable $expiresAt           = null,
+        PaymentStatus      $status              = PaymentStatus::PENDING,
+        ?PaymentAttemptId  $successfulAttemptId = null,
+        ?DateTimeImmutable $createdAt           = null,
+        ?Money             $refundedAmount      = null,
     ) {
-        $this->id             = $id;
-        $this->amount         = $amount;
-        $this->customerId     = $customerId;
-        $this->status         = PaymentStatus::PENDING;
-        $this->metadata       = $metadata;
-        $this->createdAt      = new DateTimeImmutable();
-        $this->expiresAt      = $expiresAt;
-        $this->refundedAmount = Money::ofMinor(0, $amount->getCurrency());
+        $this->id                  = $id;
+        $this->amount              = $amount;
+        $this->customerId          = $customerId;
+        $this->status              = $status;
+        $this->successfulAttemptId = $successfulAttemptId;
+        $this->metadata            = $metadata;
+        $this->createdAt           = $createdAt ?? new DateTimeImmutable();
+        $this->expiresAt           = $expiresAt;
+        $this->refundedAmount      = $refundedAmount ?? Money::ofMinor(0, $amount->getCurrency());
     }
 
     public static function create(
@@ -193,6 +198,46 @@ final class Payment
             && new DateTimeImmutable() > $this->expiresAt;
     }
 
+    /**
+     * Asserts that a new attempt can be initiated against this payment.
+     *
+     * @throws \DomainException if the payment has expired or is in a terminal status
+     */
+    public function assertCanInitiateAttempt(): void
+    {
+        if ($this->isExpired()) {
+            throw new \DomainException(
+                "Payment \"{$this->id->value}\" has expired and cannot accept new attempts."
+            );
+        }
+
+        if ($this->status->isTerminal()) {
+            throw new \DomainException(
+                "Cannot initiate attempt on payment \"{$this->id->value}\" in terminal status \"{$this->status->value}\"."
+            );
+        }
+    }
+
+    /**
+     * Asserts that a refund of the given amount can be initiated against this payment.
+     *
+     * @throws \DomainException if the payment is not refundable or the amount exceeds the refundable balance
+     */
+    public function assertCanInitiateRefund(Money $amount): void
+    {
+        if (!$this->status->isRefundable()) {
+            throw new \DomainException(
+                "Payment \"{$this->id->value}\" in status \"{$this->status->value}\" is not refundable."
+            );
+        }
+
+        if ($amount->isGreaterThan($this->getRefundableAmount())) {
+            throw new \DomainException(
+                "Refund amount exceeds the refundable balance for payment \"{$this->id->value}\"."
+            );
+        }
+    }
+
     // ── Getters ──────────────────────────────────────────────────────────────
 
     public function getId(): PaymentId                         { return $this->id; }
@@ -201,6 +246,20 @@ final class Payment
     public function getStatus(): PaymentStatus                  { return $this->status; }
     public function getMetadata(): PaymentMetadata              { return $this->metadata; }
     public function getSuccessfulAttemptId(): ?PaymentAttemptId { return $this->successfulAttemptId; }
+
+    /**
+     * Returns the successful attempt ID or throws if no successful attempt exists.
+     * Use in refund flows that require a confirmed successful attempt.
+     *
+     * @throws \DomainException
+     */
+    public function getRequiredSuccessfulAttemptId(): PaymentAttemptId
+    {
+        return $this->successfulAttemptId
+            ?? throw new \DomainException(
+                "Payment \"{$this->id->value}\" has no successful attempt to refund against."
+            );
+    }
     public function getCreatedAt(): DateTimeImmutable           { return $this->createdAt; }
     public function getExpiresAt(): ?DateTimeImmutable          { return $this->expiresAt; }
     public function getRefundedAmount(): Money                  { return $this->refundedAmount; }

@@ -7,6 +7,7 @@ use Payroad\Application\UseCase\Shared\RefundInitiationGuard;
 use Payroad\Domain\PaymentFlow\Crypto\CryptoPaymentAttempt;
 use Payroad\Domain\PaymentFlow\Crypto\CryptoRefund;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
+use Payroad\Port\Provider\Crypto\RefundableCryptoProviderInterface;
 use Payroad\Port\Provider\ProviderRegistryInterface;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;
 use Payroad\Port\Repository\RefundRepositoryInterface;
@@ -25,35 +26,30 @@ final class InitiateCryptoRefundUseCase
     {
         $payment = $this->guard->loadRefundablePayment($command->paymentId, $command->amount);
 
-        $attemptId = $payment->getSuccessfulAttemptId()
-            ?? throw new \LogicException("Payment has no successful attempt to refund against.");
+        $attemptId = $payment->getRequiredSuccessfulAttemptId();
 
-        $attempt = $this->attempts->findById($attemptId)
-            ?? throw new AttemptNotFoundException($attemptId);
+        $attempt = CryptoPaymentAttempt::fromAttempt(
+            $this->attempts->findById($attemptId) ?? throw new AttemptNotFoundException($attemptId)
+        );
 
-        // Data-consistency guard: the repository returns the abstract PaymentAttempt type.
-        // We must confirm the successful attempt belongs to the same flow before proceeding.
-        if (!$attempt instanceof CryptoPaymentAttempt) {
-            throw new \LogicException(
-                "Expected CryptoPaymentAttempt for payment \"{$command->paymentId->value}\", got " . get_class($attempt) . '.'
+        $provider = $this->providers->forCrypto($attempt->getProviderName());
+
+        if (!$provider instanceof RefundableCryptoProviderInterface) {
+            throw new \DomainException(
+                "Provider \"{$attempt->getProviderName()}\" does not support programmatic refunds."
             );
         }
 
         $id     = $this->refunds->nextId();
-        $refund = $this->providers
-            ->forCrypto($attempt->getProviderName())
-            ->initiateRefund(
-                $id,
-                $payment->getId(),
-                $attemptId,
-                $attempt->getProviderName(),
-                $command->amount,
-                $attempt->getProviderReference()
-                    ?? throw new \DomainException(
-                        "Attempt \"{$attemptId->value}\" has no provider reference — cannot initiate refund."
-                    ),
-                $command->context,
-            );
+        $refund = $provider->initiateRefund(
+            $id,
+            $payment->getId(),
+            $attemptId,
+            $attempt->getProviderName(),
+            $command->amount,
+            $attempt->getRequiredProviderReference(),
+            $command->context,
+        );
 
         $this->refunds->save($refund);
         $this->dispatcher->dispatch(...$refund->releaseEvents());

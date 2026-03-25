@@ -4,9 +4,9 @@ namespace Payroad\Application\UseCase\Card;
 
 use Payroad\Application\Exception\AttemptNotFoundException;
 use Payroad\Application\Exception\PaymentNotFoundException;
-use Payroad\Domain\Attempt\AttemptStatus;
 use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
+use Payroad\Port\Provider\Card\CapturableCardProviderInterface;
 use Payroad\Port\Provider\ProviderRegistryInterface;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;
 use Payroad\Port\Repository\PaymentRepositoryInterface;
@@ -22,31 +22,23 @@ final class VoidCardAttemptUseCase
 
     public function execute(VoidCardAttemptCommand $command): void
     {
-        $attempt = $this->attempts->findById($command->attemptId)
-            ?? throw new AttemptNotFoundException($command->attemptId);
+        $attempt = CardPaymentAttempt::fromAttempt(
+            $this->attempts->findById($command->attemptId) ?? throw new AttemptNotFoundException($command->attemptId)
+        );
 
-        if (!$attempt instanceof CardPaymentAttempt) {
+        $attempt->assertCanBeVoided();
+
+        $provider = $this->providers->forCard($attempt->getProviderName());
+
+        if (!$provider instanceof CapturableCardProviderInterface) {
             throw new \DomainException(
-                "Attempt \"{$command->attemptId->value}\" is not a card attempt."
+                "Provider \"{$attempt->getProviderName()}\" does not support void."
             );
         }
 
-        if ($attempt->getStatus() !== AttemptStatus::AUTHORIZED) {
-            throw new \DomainException(
-                "Cannot void attempt \"{$command->attemptId->value}\": must be AUTHORIZED (current: {$attempt->getStatus()->value})."
-            );
-        }
+        $result = $provider->voidAttempt($attempt->getRequiredProviderReference());
 
-        $providerReference = $attempt->getProviderReference()
-            ?? throw new \DomainException(
-                "Attempt \"{$command->attemptId->value}\" has no provider reference — cannot void."
-            );
-
-        $result = $this->providers
-            ->forCard($attempt->getProviderName())
-            ->voidAttempt($providerReference);
-
-        $attempt->applyTransition($result->newStatus, $result->providerStatus, $result->reason);
+        $attempt->applyTransition($result->newStatus, $result->providerStatus);
 
         $this->attempts->save($attempt);
 

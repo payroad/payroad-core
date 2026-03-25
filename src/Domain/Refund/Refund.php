@@ -33,20 +33,25 @@ abstract class Refund
     private DateTimeImmutable $createdAt;
 
     protected function __construct(
-        RefundId         $id,
-        PaymentId        $paymentId,
-        PaymentAttemptId $originalAttemptId,
-        string           $providerName,
-        Money            $amount
+        RefundId           $id,
+        PaymentId          $paymentId,
+        PaymentAttemptId   $originalAttemptId,
+        string             $providerName,
+        Money              $amount,
+        RefundStatus       $status            = RefundStatus::PENDING,
+        string             $providerStatus    = 'pending',
+        ?string            $providerReference = null,
+        ?DateTimeImmutable $createdAt         = null,
     ) {
         $this->id                = $id;
         $this->paymentId         = $paymentId;
         $this->originalAttemptId = $originalAttemptId;
         $this->providerName      = $providerName;
         $this->amount            = $amount;
-        $this->status            = RefundStatus::PENDING;
-        $this->providerStatus    = 'pending';
-        $this->createdAt         = new DateTimeImmutable();
+        $this->status            = $status;
+        $this->providerStatus    = $providerStatus;
+        $this->providerReference = $providerReference;
+        $this->createdAt         = $createdAt ?? new DateTimeImmutable();
     }
 
     abstract public function getMethodType(): PaymentMethodType;

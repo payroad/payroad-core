@@ -8,21 +8,18 @@ use Payroad\Domain\Attempt\AttemptStatus;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;
 use Payroad\Port\Repository\PaymentRepositoryInterface;
-use Payroad\Port\Provider\ProviderRegistryInterface;
 
 final class HandleWebhookUseCase
 {
     public function __construct(
         private PaymentRepositoryInterface        $payments,
         private PaymentAttemptRepositoryInterface $attempts,
-        private ProviderRegistryInterface         $providers,
         private DomainEventDispatcherInterface    $dispatcher
     ) {}
 
     public function execute(HandleWebhookCommand $command): void
     {
-        $provider = $this->providers->getByName($command->providerName);
-        $result   = $provider->parseWebhook($command->payload, $command->headers);
+        $result = $command->result;
 
         $attempt = $this->attempts->findByProviderReference($command->providerName, $result->providerReference)
             ?? throw new AttemptNotFoundException($result->providerReference);
@@ -38,6 +35,13 @@ final class HandleWebhookUseCase
         // Update flow-specific data (e.g. confirmation count, txHash) even without a status change.
         if ($result->updatedSpecificData !== null) {
             $attempt->updateSpecificData($result->updatedSpecificData);
+        }
+
+        // Replace the lookup reference with the real provider transaction ID when provided.
+        // Required for two-step providers (e.g. Braintree) where initiation uses a temporary
+        // reference that must be replaced with the actual transaction ID for refunds to work.
+        if ($result->newProviderReference !== null) {
+            $attempt->setProviderReference($result->newProviderReference);
         }
 
         $this->attempts->save($attempt);

@@ -3,10 +3,10 @@
 namespace Payroad\Application\UseCase\Card;
 
 use Payroad\Application\Exception\AttemptNotFoundException;
-use Payroad\Domain\Attempt\AttemptStatus;
 use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
 use Payroad\Domain\SavedPaymentMethod\SavedPaymentMethod;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
+use Payroad\Port\Provider\Card\TokenizingCardProviderInterface;
 use Payroad\Port\Provider\ProviderRegistryInterface;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;
 use Payroad\Port\Repository\SavedPaymentMethodRepositoryInterface;
@@ -22,30 +22,22 @@ final class SavePaymentMethodUseCase
 
     public function execute(SavePaymentMethodCommand $command): SavedPaymentMethod
     {
-        $attempt = $this->attempts->findById($command->attemptId)
-            ?? throw new AttemptNotFoundException($command->attemptId);
+        $attempt = CardPaymentAttempt::fromAttempt(
+            $this->attempts->findById($command->attemptId) ?? throw new AttemptNotFoundException($command->attemptId)
+        );
 
-        if (!$attempt instanceof CardPaymentAttempt) {
+        $attempt->assertCanSaveMethod();
+
+        $provider = $this->providers->forCard($attempt->getProviderName());
+
+        if (!$provider instanceof TokenizingCardProviderInterface) {
             throw new \DomainException(
-                "Cannot save payment method from attempt \"{$command->attemptId->value}\": attempt is not a card attempt."
+                "Provider \"{$attempt->getProviderName()}\" does not support card tokenization."
             );
         }
-
-        if (!$attempt->getStatus()->isSuccess()) {
-            throw new \DomainException(
-                "Cannot save payment method from attempt \"{$command->attemptId->value}\": attempt must be SUCCEEDED."
-            );
-        }
-
-        $providerReference = $attempt->getProviderReference()
-            ?? throw new \DomainException(
-                "Attempt \"{$command->attemptId->value}\" has no provider reference."
-            );
 
         $id     = $this->savedMethods->nextId();
-        $method = $this->providers
-            ->forCard($attempt->getProviderName())
-            ->savePaymentMethod($id, $command->customerId, $providerReference);
+        $method = $provider->savePaymentMethod($id, $command->customerId, $attempt->getRequiredProviderReference());
 
         $this->savedMethods->save($method);
         $this->dispatcher->dispatch(...$method->releaseEvents());

@@ -54,6 +54,19 @@ interface CardAttemptData extends AttemptData
      */
     public function getIssuingCountry(): ?string;
 
+    // ── Frontend initialisation ───────────────────────────────────────────────
+
+    /**
+     * Opaque token the client-side SDK needs to initialise the payment UI.
+     *
+     * Provider mapping:
+     *   Stripe    → clientSecret (used by Stripe.js / Elements)
+     *   Braintree → clientToken  (used by Drop-in UI)
+     *
+     * Null after a direct server-to-server charge that requires no frontend step.
+     */
+    public function getClientToken(): ?string;
+
     // ── Flow state ────────────────────────────────────────────────────────────
 
     /**

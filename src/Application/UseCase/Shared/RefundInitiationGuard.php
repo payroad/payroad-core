@@ -41,11 +41,12 @@ final class RefundInitiationGuard
         $payment = $this->payments->findById($paymentId)
             ?? throw new PaymentNotFoundException($paymentId);
 
-        if (!$payment->getStatus()->isRefundable()) {
-            throw new PaymentNotRefundableException($paymentId, $payment->getStatus());
-        }
-
-        if ($amount->isGreaterThan($payment->getRefundableAmount())) {
+        try {
+            $payment->assertCanInitiateRefund($amount);
+        } catch (\DomainException) {
+            if (!$payment->getStatus()->isRefundable()) {
+                throw new PaymentNotRefundableException($paymentId, $payment->getStatus());
+            }
             throw new RefundExceedsPaymentAmountException(
                 $paymentId,
                 $amount,

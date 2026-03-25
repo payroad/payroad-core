@@ -2,24 +2,28 @@
 
 namespace Payroad\Domain\PaymentFlow\Card;
 
+use DateTimeImmutable;
 use Payroad\Domain\PaymentMethodType;
 use Payroad\Domain\Payment\CustomerId;
 use Payroad\Domain\SavedPaymentMethod\Event\PaymentMethodSaved;
 use Payroad\Domain\SavedPaymentMethod\SavedPaymentMethod;
 use Payroad\Domain\SavedPaymentMethod\SavedPaymentMethodId;
+use Payroad\Domain\SavedPaymentMethod\SavedPaymentMethodStatus;
 
 final class CardSavedPaymentMethod extends SavedPaymentMethod
 {
     private CardSavedPaymentMethodData $data;
 
-    private function __construct(
+    public function __construct(
         SavedPaymentMethodId       $id,
         CustomerId                 $customerId,
         string                     $providerName,
         string                     $providerToken,
         CardSavedPaymentMethodData $data,
+        SavedPaymentMethodStatus   $status    = SavedPaymentMethodStatus::ACTIVE,
+        ?DateTimeImmutable         $createdAt = null,
     ) {
-        parent::__construct($id, $customerId, $providerName, $providerToken);
+        parent::__construct($id, $customerId, $providerName, $providerToken, $status, $createdAt);
         $this->data = $data;
     }
 

@@ -17,8 +17,6 @@ use Payroad\Domain\PaymentFlow\Card\CardRefund;
 use Payroad\Domain\Refund\RefundId;
 use Payroad\Domain\Refund\RefundStatus;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
-use Payroad\Port\Provider\PaymentProviderInterface;
-use Payroad\Port\Provider\ProviderRegistryInterface;
 use Payroad\Port\Provider\RefundWebhookResult;
 use Payroad\Port\Repository\PaymentRepositoryInterface;
 use Payroad\Port\Repository\RefundRepositoryInterface;
@@ -30,25 +28,18 @@ final class HandleRefundWebhookUseCaseTest extends TestCase
 {
     private PaymentRepositoryInterface&MockObject  $payments;
     private RefundRepositoryInterface&MockObject   $refunds;
-    private ProviderRegistryInterface&MockObject   $providers;
     private DomainEventDispatcherInterface&MockObject $dispatcher;
-    private PaymentProviderInterface&MockObject    $provider;
     private HandleRefundWebhookUseCase $useCase;
 
     protected function setUp(): void
     {
         $this->payments    = $this->createMock(PaymentRepositoryInterface::class);
         $this->refunds     = $this->createMock(RefundRepositoryInterface::class);
-        $this->providers   = $this->createMock(ProviderRegistryInterface::class);
         $this->dispatcher  = $this->createMock(DomainEventDispatcherInterface::class);
-        $this->provider    = $this->createMock(PaymentProviderInterface::class);
-
-        $this->providers->method('getByName')->willReturn($this->provider);
 
         $this->useCase = new HandleRefundWebhookUseCase(
             $this->payments,
             $this->refunds,
-            $this->providers,
             $this->dispatcher
         );
     }
@@ -84,13 +75,13 @@ final class HandleRefundWebhookUseCaseTest extends TestCase
 
     public function testExecuteThrowsWhenRefundNotFound(): void
     {
-        $this->provider->method('parseRefundWebhook')->willReturn(
-            new RefundWebhookResult('re_unknown', RefundStatus::SUCCEEDED, 'succeeded')
-        );
         $this->refunds->method('findByProviderReference')->willReturn(null);
 
         $this->expectException(RefundNotFoundException::class);
-        $this->useCase->execute(new HandleRefundWebhookCommand('stub', []));
+        $this->useCase->execute(new HandleRefundWebhookCommand(
+            'stub',
+            new RefundWebhookResult('re_unknown', RefundStatus::SUCCEEDED, 'succeeded'),
+        ));
     }
 
     public function testExecuteAppliesSucceededTransitionAndUpdatesPayment(): void
@@ -98,15 +89,14 @@ final class HandleRefundWebhookUseCaseTest extends TestCase
         $payment = $this->makeSucceededPayment();
         $refund  = $this->makeRefund($payment);
 
-        $this->provider->method('parseRefundWebhook')->willReturn(
-            new RefundWebhookResult('re_abc123', RefundStatus::SUCCEEDED, 'succeeded')
-        );
         $this->refunds->method('findByProviderReference')->willReturn($refund);
         $this->payments->method('findById')->willReturn($payment);
-
         $this->payments->expects($this->once())->method('save')->with($payment);
 
-        $this->useCase->execute(new HandleRefundWebhookCommand('stub', []));
+        $this->useCase->execute(new HandleRefundWebhookCommand(
+            'stub',
+            new RefundWebhookResult('re_abc123', RefundStatus::SUCCEEDED, 'succeeded'),
+        ));
 
         $this->assertSame(RefundStatus::SUCCEEDED, $refund->getStatus());
         $this->assertSame(PaymentStatus::PARTIALLY_REFUNDED, $payment->getStatus());
@@ -126,13 +116,13 @@ final class HandleRefundWebhookUseCaseTest extends TestCase
         $refund->setProviderReference('re_full');
         $refund->releaseEvents();
 
-        $this->provider->method('parseRefundWebhook')->willReturn(
-            new RefundWebhookResult('re_full', RefundStatus::SUCCEEDED, 'succeeded')
-        );
         $this->refunds->method('findByProviderReference')->willReturn($refund);
         $this->payments->method('findById')->willReturn($payment);
 
-        $this->useCase->execute(new HandleRefundWebhookCommand('stub', []));
+        $this->useCase->execute(new HandleRefundWebhookCommand(
+            'stub',
+            new RefundWebhookResult('re_full', RefundStatus::SUCCEEDED, 'succeeded'),
+        ));
 
         $this->assertSame(PaymentStatus::REFUNDED, $payment->getStatus());
     }
@@ -142,14 +132,13 @@ final class HandleRefundWebhookUseCaseTest extends TestCase
         $payment = $this->makeSucceededPayment();
         $refund  = $this->makeRefund($payment);
 
-        $this->provider->method('parseRefundWebhook')->willReturn(
-            new RefundWebhookResult('re_abc123', RefundStatus::FAILED, 'failed', 'provider_error')
-        );
         $this->refunds->method('findByProviderReference')->willReturn($refund);
-
         $this->payments->expects($this->never())->method('save');
 
-        $this->useCase->execute(new HandleRefundWebhookCommand('stub', []));
+        $this->useCase->execute(new HandleRefundWebhookCommand(
+            'stub',
+            new RefundWebhookResult('re_abc123', RefundStatus::FAILED, 'failed', 'provider_error'),
+        ));
 
         $this->assertSame(RefundStatus::FAILED, $refund->getStatus());
         $this->assertSame(PaymentStatus::SUCCEEDED, $payment->getStatus());
@@ -162,17 +151,16 @@ final class HandleRefundWebhookUseCaseTest extends TestCase
         $refund->applyTransition(RefundStatus::SUCCEEDED, 'succeeded');
         $refund->releaseEvents();
 
-        // Duplicate webhook: refund already SUCCEEDED — transition must be skipped.
-        $this->provider->method('parseRefundWebhook')->willReturn(
-            new RefundWebhookResult('re_abc123', RefundStatus::SUCCEEDED, 'succeeded')
-        );
         $this->refunds->method('findByProviderReference')->willReturn($refund);
 
         // Payment must not be loaded or modified — would double-count the refund.
         $this->payments->expects($this->never())->method('findById');
         $this->payments->expects($this->never())->method('save');
 
-        $this->useCase->execute(new HandleRefundWebhookCommand('stub', []));
+        $this->useCase->execute(new HandleRefundWebhookCommand(
+            'stub',
+            new RefundWebhookResult('re_abc123', RefundStatus::SUCCEEDED, 'succeeded'),
+        ));
 
         $this->assertSame(RefundStatus::SUCCEEDED, $refund->getStatus());
     }
@@ -184,13 +172,13 @@ final class HandleRefundWebhookUseCaseTest extends TestCase
         $refund->applyTransition(RefundStatus::SUCCEEDED, 'succeeded');
         $refund->releaseEvents();
 
-        $this->provider->method('parseRefundWebhook')->willReturn(
-            new RefundWebhookResult('re_abc123', RefundStatus::FAILED, 'failed') // duplicate
-        );
         $this->refunds->method('findByProviderReference')->willReturn($refund);
         $this->payments->method('findById')->willReturn($payment);
 
-        $this->useCase->execute(new HandleRefundWebhookCommand('stub', []));
+        $this->useCase->execute(new HandleRefundWebhookCommand(
+            'stub',
+            new RefundWebhookResult('re_abc123', RefundStatus::FAILED, 'failed'), // duplicate
+        ));
 
         // Status must remain SUCCEEDED, not change to FAILED
         $this->assertSame(RefundStatus::SUCCEEDED, $refund->getStatus());

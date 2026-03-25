@@ -8,7 +8,6 @@ use Payroad\Application\UseCase\Webhook\HandleWebhookUseCase;
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStatus;
 use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
-use Payroad\Domain\Attempt\PaymentAttempt;
 use Payroad\Domain\DomainEvent;
 use Payroad\Domain\Money\Currency;
 use Payroad\Domain\Money\Money;
@@ -19,9 +18,7 @@ use Payroad\Domain\Payment\PaymentMetadata;
 use Payroad\Domain\Payment\PaymentStatus;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;
-use Payroad\Port\Provider\PaymentProviderInterface;
 use Payroad\Port\Repository\PaymentRepositoryInterface;
-use Payroad\Port\Provider\ProviderRegistryInterface;
 use Payroad\Port\Provider\WebhookResult;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -31,25 +28,18 @@ final class HandleWebhookUseCaseTest extends TestCase
 {
     private PaymentRepositoryInterface&MockObject $payments;
     private PaymentAttemptRepositoryInterface&MockObject $attempts;
-    private ProviderRegistryInterface&MockObject $providers;
     private DomainEventDispatcherInterface&MockObject $dispatcher;
-    private PaymentProviderInterface&MockObject $provider;
     private HandleWebhookUseCase $useCase;
 
     protected function setUp(): void
     {
         $this->payments   = $this->createMock(PaymentRepositoryInterface::class);
         $this->attempts   = $this->createMock(PaymentAttemptRepositoryInterface::class);
-        $this->providers  = $this->createMock(ProviderRegistryInterface::class);
         $this->dispatcher = $this->createMock(DomainEventDispatcherInterface::class);
-        $this->provider   = $this->createMock(PaymentProviderInterface::class);
-
-        $this->providers->method('getByName')->willReturn($this->provider);
 
         $this->useCase = new HandleWebhookUseCase(
             $this->payments,
             $this->attempts,
-            $this->providers,
             $this->dispatcher
         );
     }
@@ -85,27 +75,26 @@ final class HandleWebhookUseCaseTest extends TestCase
         return $attempt;
     }
 
-    private function makeCommand(string $providerName = 'stub'): HandleWebhookCommand
+    private function makeCommand(WebhookResult $result, string $providerName = 'stub'): HandleWebhookCommand
     {
-        return new HandleWebhookCommand($providerName, ['event' => 'payment.succeeded'], []);
+        return new HandleWebhookCommand($providerName, $result);
     }
 
-    public function testExecuteCallsParseWebhookAndAppliesTransitionWhenStatusChangedIsTrue(): void
+    public function testExecuteAppliesTransitionWhenStatusChangedIsTrue(): void
     {
         $payment = $this->makePayment();
         $attempt = $this->makePendingAttempt($payment);
 
-        $webhookResult = new WebhookResult(
+        $result = new WebhookResult(
             providerReference: 'ref-abc',
             newStatus: AttemptStatus::PROCESSING,
             providerStatus: 'processing',
             statusChanged: true,
         );
 
-        $this->provider->method('parseWebhook')->willReturn($webhookResult);
         $this->attempts->method('findByProviderReference')->willReturn($attempt);
 
-        $this->useCase->execute($this->makeCommand());
+        $this->useCase->execute($this->makeCommand($result));
 
         $this->assertSame(AttemptStatus::PROCESSING, $attempt->getStatus());
     }
@@ -116,7 +105,7 @@ final class HandleWebhookUseCaseTest extends TestCase
         $attempt     = $this->makePendingAttempt($payment);
         $updatedData = new StubSpecificData();
 
-        $webhookResult = new WebhookResult(
+        $result = new WebhookResult(
             providerReference: 'ref-abc',
             newStatus: AttemptStatus::PROCESSING,
             providerStatus: 'processing',
@@ -124,10 +113,9 @@ final class HandleWebhookUseCaseTest extends TestCase
             updatedSpecificData: $updatedData,
         );
 
-        $this->provider->method('parseWebhook')->willReturn($webhookResult);
         $this->attempts->method('findByProviderReference')->willReturn($attempt);
 
-        $this->useCase->execute($this->makeCommand());
+        $this->useCase->execute($this->makeCommand($result));
 
         $this->assertSame(AttemptStatus::PENDING, $attempt->getStatus());
         $this->assertSame($updatedData, $attempt->getData());
@@ -138,36 +126,34 @@ final class HandleWebhookUseCaseTest extends TestCase
         $payment = $this->makePayment();
         $attempt = $this->makeProcessingAttempt($payment);
 
-        $webhookResult = new WebhookResult(
+        $result = new WebhookResult(
             providerReference: 'ref-abc',
             newStatus: AttemptStatus::SUCCEEDED,
             providerStatus: 'succeeded',
             statusChanged: true,
         );
 
-        $this->provider->method('parseWebhook')->willReturn($webhookResult);
         $this->attempts->method('findByProviderReference')->willReturn($attempt);
         $this->payments->method('findById')->willReturn($payment);
         $this->payments->expects($this->once())->method('save')->with($payment);
 
-        $this->useCase->execute($this->makeCommand());
+        $this->useCase->execute($this->makeCommand($result));
 
         $this->assertSame(PaymentStatus::SUCCEEDED, $payment->getStatus());
     }
 
     public function testExecuteThrowsAttemptNotFoundExceptionWhenAttemptNotFound(): void
     {
-        $webhookResult = new WebhookResult(
+        $result = new WebhookResult(
             providerReference: 'ref-missing',
             newStatus: AttemptStatus::SUCCEEDED,
             providerStatus: 'succeeded',
         );
 
-        $this->provider->method('parseWebhook')->willReturn($webhookResult);
         $this->attempts->method('findByProviderReference')->willReturn(null);
 
         $this->expectException(AttemptNotFoundException::class);
-        $this->useCase->execute($this->makeCommand());
+        $this->useCase->execute($this->makeCommand($result));
     }
 
     public function testExecuteDispatchesAttemptEvents(): void
@@ -176,14 +162,13 @@ final class HandleWebhookUseCaseTest extends TestCase
         $attempt = $this->makePendingAttempt($payment);
         $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
 
-        $webhookResult = new WebhookResult(
+        $result = new WebhookResult(
             providerReference: 'ref-abc',
             newStatus: AttemptStatus::PROCESSING,
             providerStatus: 'processing',
             statusChanged: false,
         );
 
-        $this->provider->method('parseWebhook')->willReturn($webhookResult);
         $this->attempts->method('findByProviderReference')->willReturn($attempt);
 
         $this->dispatcher
@@ -191,7 +176,7 @@ final class HandleWebhookUseCaseTest extends TestCase
             ->method('dispatch')
             ->with($this->isInstanceOf(DomainEvent::class));
 
-        $this->useCase->execute($this->makeCommand());
+        $this->useCase->execute($this->makeCommand($result));
     }
 
     public function testExecuteIsIdempotentWhenWebhookDeliveredTwice(): void
@@ -204,18 +189,17 @@ final class HandleWebhookUseCaseTest extends TestCase
         $attempt->releaseEvents();
 
         // Second delivery: attempt is already terminal — must not throw.
-        $webhookResult = new WebhookResult(
+        $result = new WebhookResult(
             providerReference: 'ref-abc',
             newStatus: AttemptStatus::SUCCEEDED,
             providerStatus: 'succeeded',
             statusChanged: true,
         );
 
-        $this->provider->method('parseWebhook')->willReturn($webhookResult);
         $this->attempts->method('findByProviderReference')->willReturn($attempt);
 
         // Should complete without throwing InvalidTransitionException.
-        $this->useCase->execute($this->makeCommand());
+        $this->useCase->execute($this->makeCommand($result));
 
         $this->assertSame(AttemptStatus::SUCCEEDED, $attempt->getStatus());
     }
@@ -225,20 +209,19 @@ final class HandleWebhookUseCaseTest extends TestCase
         $payment = $this->makePayment();
         $attempt = $this->makeProcessingAttempt($payment);
 
-        $webhookResult = new WebhookResult(
+        $result = new WebhookResult(
             providerReference: 'ref-abc',
             newStatus: AttemptStatus::SUCCEEDED,
             providerStatus: 'succeeded',
             statusChanged: true,
         );
 
-        $this->provider->method('parseWebhook')->willReturn($webhookResult);
         $this->attempts->method('findByProviderReference')->willReturn($attempt);
         $this->payments->method('findById')->willReturn($payment);
 
         $this->dispatcher->expects($this->exactly(2))->method('dispatch');
 
-        $this->useCase->execute($this->makeCommand());
+        $this->useCase->execute($this->makeCommand($result));
     }
 
     public function testExecuteMarksPaymentAsRetryableWhenAttemptFails(): void
@@ -246,19 +229,18 @@ final class HandleWebhookUseCaseTest extends TestCase
         $payment = $this->makePayment();
         $attempt = $this->makeProcessingAttempt($payment);
 
-        $webhookResult = new WebhookResult(
+        $result = new WebhookResult(
             providerReference: 'ref-abc',
             newStatus: AttemptStatus::FAILED,
             providerStatus: 'failed',
             statusChanged: true,
         );
 
-        $this->provider->method('parseWebhook')->willReturn($webhookResult);
         $this->attempts->method('findByProviderReference')->willReturn($attempt);
         $this->payments->method('findById')->willReturn($payment);
         $this->payments->expects($this->once())->method('save')->with($payment);
 
-        $this->useCase->execute($this->makeCommand());
+        $this->useCase->execute($this->makeCommand($result));
 
         $this->assertSame(PaymentStatus::PENDING, $payment->getStatus());
     }
@@ -271,18 +253,17 @@ final class HandleWebhookUseCaseTest extends TestCase
         $payment = $this->makePayment();
         $attempt = $this->makeProcessingAttempt($payment);
 
-        $webhookResult = new WebhookResult(
+        $result = new WebhookResult(
             providerReference: 'ref-abc',
             newStatus: $status,
             providerStatus: $status->value,
             statusChanged: true,
         );
 
-        $this->provider->method('parseWebhook')->willReturn($webhookResult);
         $this->attempts->method('findByProviderReference')->willReturn($attempt);
         $this->payments->method('findById')->willReturn($payment);
 
-        $this->useCase->execute($this->makeCommand());
+        $this->useCase->execute($this->makeCommand($result));
 
         $this->assertSame(PaymentStatus::PENDING, $payment->getStatus());
     }
@@ -303,21 +284,20 @@ final class HandleWebhookUseCaseTest extends TestCase
         $attempt->releaseEvents();
 
         // Duplicate webhook: attempt already SUCCEEDED — transition must be skipped.
-        $webhookResult = new WebhookResult(
+        $result = new WebhookResult(
             providerReference: 'ref-abc',
             newStatus: AttemptStatus::SUCCEEDED,
             providerStatus: 'succeeded',
             statusChanged: true,
         );
 
-        $this->provider->method('parseWebhook')->willReturn($webhookResult);
         $this->attempts->method('findByProviderReference')->willReturn($attempt);
 
         // Payment must not be loaded or saved — transition was not applied.
         $this->payments->expects($this->never())->method('findById');
         $this->payments->expects($this->never())->method('save');
 
-        $this->useCase->execute($this->makeCommand());
+        $this->useCase->execute($this->makeCommand($result));
     }
 
     public function testExecuteDoesNotTouchPaymentWhenAttemptTransitionsToNonTerminalStatus(): void
@@ -325,18 +305,17 @@ final class HandleWebhookUseCaseTest extends TestCase
         $payment = $this->makePayment();
         $attempt = $this->makePendingAttempt($payment);
 
-        $webhookResult = new WebhookResult(
+        $result = new WebhookResult(
             providerReference: 'ref-abc',
             newStatus: AttemptStatus::PROCESSING,
             providerStatus: 'processing',
             statusChanged: true,
         );
 
-        $this->provider->method('parseWebhook')->willReturn($webhookResult);
         $this->attempts->method('findByProviderReference')->willReturn($attempt);
 
         $this->payments->expects($this->never())->method('findById');
 
-        $this->useCase->execute($this->makeCommand());
+        $this->useCase->execute($this->makeCommand($result));
     }
 }

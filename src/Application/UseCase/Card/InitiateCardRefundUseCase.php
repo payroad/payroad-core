@@ -25,19 +25,11 @@ final class InitiateCardRefundUseCase
     {
         $payment = $this->guard->loadRefundablePayment($command->paymentId, $command->amount);
 
-        $attemptId = $payment->getSuccessfulAttemptId()
-            ?? throw new \LogicException("Payment has no successful attempt to refund against.");
+        $attemptId = $payment->getRequiredSuccessfulAttemptId();
 
-        $attempt = $this->attempts->findById($attemptId)
-            ?? throw new AttemptNotFoundException($attemptId);
-
-        // Data-consistency guard: the repository returns the abstract PaymentAttempt type.
-        // We must confirm the successful attempt belongs to the same flow before proceeding.
-        if (!$attempt instanceof CardPaymentAttempt) {
-            throw new \LogicException(
-                "Expected CardPaymentAttempt for payment \"{$command->paymentId->value}\", got " . get_class($attempt) . '.'
-            );
-        }
+        $attempt = CardPaymentAttempt::fromAttempt(
+            $this->attempts->findById($attemptId) ?? throw new AttemptNotFoundException($attemptId)
+        );
 
         $id     = $this->refunds->nextId();
         $refund = $this->providers
@@ -48,10 +40,7 @@ final class InitiateCardRefundUseCase
                 $attemptId,
                 $attempt->getProviderName(),
                 $command->amount,
-                $attempt->getProviderReference()
-                    ?? throw new \DomainException(
-                        "Attempt \"{$attemptId->value}\" has no provider reference — cannot initiate refund."
-                    ),
+                $attempt->getRequiredProviderReference(),
                 $command->context,
             );
 
