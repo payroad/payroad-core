@@ -38,6 +38,18 @@ final class InitiateCardAttemptUseCase
         $payment->markProcessing();
 
         $this->attempts->save($attempt);
+
+        // Some providers (e.g. mock, Braintree sync) resolve synchronously inside
+        // initiateCardAttempt(). If the attempt is already terminal, propagate to the
+        // payment immediately — no webhook will arrive to do it later.
+        if ($attempt->getStatus()->isTerminal()) {
+            if ($attempt->getStatus()->isSuccess()) {
+                $payment->markSucceeded($attempt->getId());
+            } else {
+                $payment->markRetryable();
+            }
+        }
+
         $this->payments->save($payment);
 
         $this->dispatcher->dispatch(
