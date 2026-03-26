@@ -11,8 +11,16 @@ use Payroad\Domain\Attempt\AttemptStatus;
  * AttemptStatus — they only update SpecificData via the provider.
  *
  * PENDING ──► PROCESSING ──► SUCCEEDED
- *                        └──► FAILED
- *                        └──► EXPIRED
+ *         └──► SUCCEEDED    └──► FAILED
+ *         └──► FAILED       └──► EXPIRED
+ *
+ * Direct PENDING → SUCCEEDED is allowed for providers that confirm instantly
+ * without an intermediate "confirming" status (e.g. CoinGate "paid" event).
+ *
+ * Underpayment (NOWPayments "partially_paid", CoinGate partial):
+ *   PENDING ──► PARTIALLY_PAID ──► SUCCEEDED  (customer topped up)
+ *                              └──► EXPIRED
+ *                              └──► FAILED
  */
 final class CryptoStateMachine implements AttemptStateMachineInterface
 {
@@ -25,6 +33,16 @@ final class CryptoStateMachine implements AttemptStateMachineInterface
         return match ($from) {
             AttemptStatus::PENDING => in_array($to, [
                 AttemptStatus::PROCESSING,
+                AttemptStatus::PARTIALLY_PAID,
+                AttemptStatus::SUCCEEDED,
+                AttemptStatus::FAILED,
+                AttemptStatus::EXPIRED,
+                AttemptStatus::CANCELED,
+            ], true),
+
+            AttemptStatus::PARTIALLY_PAID => in_array($to, [
+                AttemptStatus::SUCCEEDED,
+                AttemptStatus::EXPIRED,
                 AttemptStatus::FAILED,
             ], true),
 

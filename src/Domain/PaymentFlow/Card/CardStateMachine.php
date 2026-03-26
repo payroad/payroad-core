@@ -22,6 +22,12 @@ use Payroad\Domain\Attempt\AttemptStatus;
  *                          └──► CANCELED
  *                          └──► FAILED
  *
+ * Partial capture (Adyen, Braintree multi-capture):
+ *   AUTHORIZED ──► PARTIALLY_CAPTURED ──► PARTIALLY_CAPTURED  (more partial captures)
+ *                                     └──► PROCESSING          (final capture, async settlement)
+ *                                     └──► SUCCEEDED           (final capture, sync settlement)
+ *                                     └──► CANCELED            (void remaining hold)
+ *
  * 3DS / redirect:
  *   PENDING ──► AWAITING_CONFIRMATION ──► PROCESSING ──► SUCCEEDED
  *                                     └──► FAILED       └──► FAILED
@@ -45,6 +51,15 @@ final class CardStateMachine implements AttemptStateMachineInterface
             ], true),
 
             AttemptStatus::AUTHORIZED => in_array($to, [
+                AttemptStatus::PARTIALLY_CAPTURED,
+                AttemptStatus::PROCESSING,
+                AttemptStatus::SUCCEEDED,
+                AttemptStatus::CANCELED,
+                AttemptStatus::FAILED,
+            ], true),
+
+            AttemptStatus::PARTIALLY_CAPTURED => in_array($to, [
+                AttemptStatus::PARTIALLY_CAPTURED,
                 AttemptStatus::PROCESSING,
                 AttemptStatus::SUCCEEDED,
                 AttemptStatus::CANCELED,
