@@ -310,9 +310,11 @@ vendor/bin/phpunit --filter testPaymentMarkedSucceededOnSyncCapture
 |---------|-------------|
 | `payroad/payroad-core` | **This package** |
 | `payroad/stripe-provider` | Card payments via Stripe |
+| `payroad/braintree-provider` | Card payments via Braintree |
 | `payroad/nowpayments-provider` | Crypto payments via NOWPayments |
-| `payroad/wechat-provider` | P2P payments via WeChat Pay |
-| `payroad/demo` | Symfony reference application |
+| `payroad/coingate-provider` | Crypto payments via CoinGate |
+| `payroad/quickstart` | 5-minute quickstart — mock card + Stripe |
+| `payroad/payroad-symfony-demo` | Full reference application (all flows) |
 
 ---
 
