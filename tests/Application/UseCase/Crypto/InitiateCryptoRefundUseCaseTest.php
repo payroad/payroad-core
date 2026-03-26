@@ -19,7 +19,7 @@ use Payroad\Domain\PaymentFlow\Crypto\CryptoPaymentAttempt;
 use Payroad\Domain\PaymentFlow\Crypto\CryptoRefund;
 use Payroad\Domain\Refund\RefundId;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
-use Payroad\Port\Provider\Crypto\CryptoProviderInterface;
+use Payroad\Port\Provider\Crypto\RefundableCryptoProviderInterface;
 use Payroad\Port\Provider\Crypto\CryptoRefundContext;
 use Payroad\Port\Provider\ProviderRegistryInterface;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;
@@ -37,7 +37,7 @@ final class InitiateCryptoRefundUseCaseTest extends TestCase
     private RefundRepositoryInterface&MockObject         $refunds;
     private ProviderRegistryInterface&MockObject         $providers;
     private DomainEventDispatcherInterface&MockObject    $dispatcher;
-    private CryptoProviderInterface&MockObject           $cryptoProvider;
+    private RefundableCryptoProviderInterface&MockObject $cryptoProvider;
     private InitiateCryptoRefundUseCase $useCase;
 
     protected function setUp(): void
@@ -47,7 +47,7 @@ final class InitiateCryptoRefundUseCaseTest extends TestCase
         $this->refunds        = $this->createMock(RefundRepositoryInterface::class);
         $this->providers      = $this->createMock(ProviderRegistryInterface::class);
         $this->dispatcher     = $this->createMock(DomainEventDispatcherInterface::class);
-        $this->cryptoProvider = $this->createMock(CryptoProviderInterface::class);
+        $this->cryptoProvider = $this->createMock(RefundableCryptoProviderInterface::class);
 
         $this->providers->method('forCrypto')->willReturn($this->cryptoProvider);
         $this->refunds->method('nextId')->willReturn(RefundId::generate());

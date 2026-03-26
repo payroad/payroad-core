@@ -96,7 +96,9 @@ final class CardAttemptDataTest extends TestCase
         $attempt = $this->makeAttempt();
 
         $this->expectException(\InvalidArgumentException::class);
-        $attempt->updateSpecificData(new class implements \Payroad\Domain\Attempt\AttemptData {});
+        $attempt->updateSpecificData(new class implements \Payroad\Domain\Attempt\AttemptData {
+            public function toArray(): array { return []; }
+        });
     }
 
     public function testAttemptTransitionPreservesCardData(): void

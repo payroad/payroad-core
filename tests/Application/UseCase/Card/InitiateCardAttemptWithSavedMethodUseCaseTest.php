@@ -22,7 +22,7 @@ use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
 use Payroad\Domain\PaymentFlow\Card\CardSavedPaymentMethod;
 use Payroad\Domain\SavedPaymentMethod\SavedPaymentMethodId;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
-use Payroad\Port\Provider\Card\CardProviderInterface;
+use Payroad\Port\Provider\Card\TokenizingCardProviderInterface;
 use Payroad\Port\Provider\ProviderRegistryInterface;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;
 use Payroad\Port\Repository\PaymentRepositoryInterface;
@@ -39,7 +39,7 @@ final class InitiateCardAttemptWithSavedMethodUseCaseTest extends TestCase
     private SavedPaymentMethodRepositoryInterface&MockObject $savedMethods;
     private ProviderRegistryInterface&MockObject             $providers;
     private DomainEventDispatcherInterface&MockObject        $dispatcher;
-    private CardProviderInterface&MockObject                 $cardProvider;
+    private TokenizingCardProviderInterface&MockObject       $cardProvider;
     private InitiateCardAttemptWithSavedMethodUseCase $useCase;
 
     private CardSavedPaymentMethod $savedMethod;
@@ -51,7 +51,7 @@ final class InitiateCardAttemptWithSavedMethodUseCaseTest extends TestCase
         $this->savedMethods  = $this->createMock(SavedPaymentMethodRepositoryInterface::class);
         $this->providers     = $this->createMock(ProviderRegistryInterface::class);
         $this->dispatcher    = $this->createMock(DomainEventDispatcherInterface::class);
-        $this->cardProvider  = $this->createMock(CardProviderInterface::class);
+        $this->cardProvider  = $this->createMock(TokenizingCardProviderInterface::class);
 
         $this->savedMethod = CardSavedPaymentMethod::create(
             SavedPaymentMethodId::generate(),

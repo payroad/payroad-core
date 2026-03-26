@@ -49,9 +49,21 @@ final class CryptoStateMachineTest extends TestCase
         $this->assertTrue($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::FAILED));
     }
 
-    public function testPendingToSucceededIsNotAllowed(): void
+    // Direct PENDING → SUCCEEDED is intentionally allowed for providers that confirm
+    // instantly without an intermediate status (e.g. CoinGate "paid" event).
+    public function testPendingToSucceededIsAllowed(): void
     {
-        $this->assertFalse($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::SUCCEEDED));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::SUCCEEDED));
+    }
+
+    public function testPendingToPartiallyPaidIsAllowed(): void
+    {
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::PARTIALLY_PAID));
+    }
+
+    public function testPendingToAwaitingConfirmationIsNotAllowed(): void
+    {
+        $this->assertFalse($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::AWAITING_CONFIRMATION));
     }
 
     // ── PROCESSING transitions ────────────────────────────────────────────────
@@ -85,7 +97,8 @@ final class CryptoStateMachineTest extends TestCase
         $attempt = $this->makeAttempt();
 
         $this->expectException(InvalidTransitionException::class);
-        $attempt->applyTransition(AttemptStatus::SUCCEEDED, 'succeeded');
+        // PENDING → AWAITING_CONFIRMATION is not a valid crypto transition
+        $attempt->applyTransition(AttemptStatus::AWAITING_CONFIRMATION, 'awaiting');
     }
 
     public function testApplyTransitionOnAttemptAppliesValidTransition(): void

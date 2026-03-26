@@ -16,7 +16,7 @@ use Payroad\Domain\Payment\PaymentId;
 use Payroad\Domain\Payment\PaymentMetadata;
 use Payroad\Domain\Payment\PaymentStatus;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
-use Payroad\Port\Provider\Card\CardProviderInterface;
+use Payroad\Port\Provider\Card\CapturableCardProviderInterface;
 use Payroad\Port\Provider\Card\CaptureResult;
 use Payroad\Port\Provider\ProviderRegistryInterface;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;
@@ -31,7 +31,7 @@ final class CaptureCardAttemptUseCaseTest extends TestCase
     private PaymentRepositoryInterface&MockObject        $payments;
     private ProviderRegistryInterface&MockObject         $providers;
     private DomainEventDispatcherInterface&MockObject    $dispatcher;
-    private CardProviderInterface&MockObject             $cardProvider;
+    private CapturableCardProviderInterface&MockObject   $cardProvider;
     private CaptureCardAttemptUseCase $useCase;
 
     protected function setUp(): void
@@ -40,7 +40,7 @@ final class CaptureCardAttemptUseCaseTest extends TestCase
         $this->payments     = $this->createMock(PaymentRepositoryInterface::class);
         $this->providers    = $this->createMock(ProviderRegistryInterface::class);
         $this->dispatcher   = $this->createMock(DomainEventDispatcherInterface::class);
-        $this->cardProvider = $this->createMock(CardProviderInterface::class);
+        $this->cardProvider = $this->createMock(CapturableCardProviderInterface::class);
 
         $this->providers->method('forCard')->willReturn($this->cardProvider);
 
