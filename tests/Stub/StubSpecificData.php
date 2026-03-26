@@ -18,4 +18,5 @@ final class StubSpecificData implements CardAttemptData
     public function getClientToken(): ?string    { return null; }
     public function requiresUserAction(): bool   { return false; }
     public function getThreeDSData(): ?ThreeDSData { return null; }
+    public function toArray(): array               { return []; }
 }

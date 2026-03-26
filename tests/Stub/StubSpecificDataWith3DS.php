@@ -32,4 +32,5 @@ final class StubSpecificDataWith3DS implements CardAttemptData
     public function getClientToken(): ?string    { return null; }
     public function requiresUserAction(): bool   { return true; }
     public function getThreeDSData(): ?ThreeDSData { return $this->threeDSData; }
+    public function toArray(): array               { return []; }
 }

@@ -16,4 +16,8 @@ final class StubCryptoData implements CryptoAttemptData
     public function getPayAmount(): string            { return '0.001'; }
     public function getConfirmationCount(): int       { return $this->confirmationCount; }
     public function getRequiredConfirmations(): int   { return $this->requiredConfirmations; }
+    public function getActualPaidAmount(): ?string    { return null; }
+    public function getPaymentUrl(): ?string          { return null; }
+    public function getMemo(): ?string                { return null; }
+    public function toArray(): array                  { return []; }
 }
