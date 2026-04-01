@@ -61,9 +61,41 @@ final class CryptoStateMachineTest extends TestCase
         $this->assertTrue($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::PARTIALLY_PAID));
     }
 
-    public function testPendingToAwaitingConfirmationIsNotAllowed(): void
+    public function testPendingToAwaitingConfirmationIsAllowed(): void
     {
-        $this->assertFalse($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::AWAITING_CONFIRMATION));
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::PENDING, AttemptStatus::AWAITING_CONFIRMATION));
+    }
+
+    // ── AWAITING_CONFIRMATION transitions ────────────────────────────────────
+
+    public function testAwaitingConfirmationToProcessingIsAllowed(): void
+    {
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::AWAITING_CONFIRMATION, AttemptStatus::PROCESSING));
+    }
+
+    public function testAwaitingConfirmationToSucceededIsAllowed(): void
+    {
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::AWAITING_CONFIRMATION, AttemptStatus::SUCCEEDED));
+    }
+
+    public function testAwaitingConfirmationToPartiallyPaidIsAllowed(): void
+    {
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::AWAITING_CONFIRMATION, AttemptStatus::PARTIALLY_PAID));
+    }
+
+    public function testAwaitingConfirmationToFailedIsAllowed(): void
+    {
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::AWAITING_CONFIRMATION, AttemptStatus::FAILED));
+    }
+
+    public function testAwaitingConfirmationToExpiredIsAllowed(): void
+    {
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::AWAITING_CONFIRMATION, AttemptStatus::EXPIRED));
+    }
+
+    public function testAwaitingConfirmationToCanceledIsAllowed(): void
+    {
+        $this->assertTrue($this->sm->canTransition(AttemptStatus::AWAITING_CONFIRMATION, AttemptStatus::CANCELED));
     }
 
     // ── PROCESSING transitions ────────────────────────────────────────────────
@@ -95,10 +127,11 @@ final class CryptoStateMachineTest extends TestCase
     public function testApplyTransitionOnAttemptThrowsOnInvalidTransition(): void
     {
         $attempt = $this->makeAttempt();
+        $attempt->markAwaitingConfirmation('waiting');
 
         $this->expectException(InvalidTransitionException::class);
-        // PENDING → AWAITING_CONFIRMATION is not a valid crypto transition
-        $attempt->markAwaitingConfirmation('awaiting');
+        // AWAITING_CONFIRMATION → AUTHORIZED is not a valid crypto transition
+        $attempt->markAuthorized('authorized');
     }
 
     public function testApplyTransitionOnAttemptAppliesValidTransition(): void
@@ -109,5 +142,16 @@ final class CryptoStateMachineTest extends TestCase
         $attempt->markProcessing('processing');
 
         $this->assertSame(AttemptStatus::PROCESSING, $attempt->getStatus());
+    }
+
+    public function testMarkAwaitingConfirmationThenSucceededIsAllowed(): void
+    {
+        $attempt = $this->makeAttempt();
+        $attempt->releaseEvents();
+
+        $attempt->markAwaitingConfirmation('waiting');
+        $attempt->markSucceeded('paid');
+
+        $this->assertSame(AttemptStatus::SUCCEEDED, $attempt->getStatus());
     }
 }

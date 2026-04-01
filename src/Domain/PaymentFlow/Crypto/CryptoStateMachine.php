@@ -10,17 +10,21 @@ use Payroad\Domain\Attempt\AttemptStatus;
  * Intermediate confirmation updates (confirmations: 3/6) do not change
  * AttemptStatus — they only update SpecificData via the provider.
  *
- * PENDING ──► PROCESSING ──► SUCCEEDED
- *         └──► SUCCEEDED    └──► FAILED
- *         └──► FAILED       └──► EXPIRED
+ * Standard flow (NOWPayments, CoinGate):
+ *   PENDING ──► AWAITING_CONFIRMATION ──► PROCESSING ──► SUCCEEDED
+ *                                     └──► SUCCEEDED    └──► FAILED
+ *                                     └──► FAILED       └──► EXPIRED
+ *                                     └──► EXPIRED
+ *                                     └──► CANCELED
  *
  * Direct PENDING → SUCCEEDED is allowed for providers that confirm instantly
- * without an intermediate "confirming" status (e.g. CoinGate "paid" event).
+ * without an intermediate status (e.g. CoinGate "paid" in sandbox).
  *
- * Underpayment (NOWPayments "partially_paid", CoinGate partial):
- *   PENDING ──► PARTIALLY_PAID ──► SUCCEEDED  (customer topped up)
- *                              └──► EXPIRED
- *                              └──► FAILED
+ * Underpayment (NOWPayments "partially_paid"):
+ *   AWAITING_CONFIRMATION ──► PARTIALLY_PAID ──► SUCCEEDED  (customer topped up)
+ *   PENDING               ──► PARTIALLY_PAID               (legacy / direct underpayment)
+ *                                              └──► EXPIRED
+ *                                              └──► FAILED
  */
 final class CryptoStateMachine implements AttemptStateMachineInterface
 {
@@ -32,6 +36,16 @@ final class CryptoStateMachine implements AttemptStateMachineInterface
 
         return match ($from) {
             AttemptStatus::PENDING => in_array($to, [
+                AttemptStatus::AWAITING_CONFIRMATION,
+                AttemptStatus::PROCESSING,
+                AttemptStatus::PARTIALLY_PAID,
+                AttemptStatus::SUCCEEDED,
+                AttemptStatus::FAILED,
+                AttemptStatus::EXPIRED,
+                AttemptStatus::CANCELED,
+            ], true),
+
+            AttemptStatus::AWAITING_CONFIRMATION => in_array($to, [
                 AttemptStatus::PROCESSING,
                 AttemptStatus::PARTIALLY_PAID,
                 AttemptStatus::SUCCEEDED,
