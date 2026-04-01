@@ -32,6 +32,7 @@ final class HandleWebhookUseCase
                 \Payroad\Domain\Attempt\AttemptStatus::AWAITING_CONFIRMATION => $attempt->markAwaitingConfirmation($result->providerStatus),
                 \Payroad\Domain\Attempt\AttemptStatus::PROCESSING            => $attempt->markProcessing($result->providerStatus),
                 \Payroad\Domain\Attempt\AttemptStatus::PARTIALLY_CAPTURED    => $attempt->markPartiallyCaptured($result->providerStatus),
+                \Payroad\Domain\Attempt\AttemptStatus::PARTIALLY_PAID        => $attempt->markPartiallyPaid($result->providerStatus),
                 \Payroad\Domain\Attempt\AttemptStatus::SUCCEEDED             => $attempt->markSucceeded($result->providerStatus),
                 \Payroad\Domain\Attempt\AttemptStatus::FAILED                => $attempt->markFailed($result->providerStatus, $result->reason),
                 \Payroad\Domain\Attempt\AttemptStatus::CANCELED              => $attempt->markCanceled($result->providerStatus, $result->reason),

@@ -90,6 +90,11 @@ abstract class PaymentAttempt
         $this->applyTransition(AttemptStatus::PARTIALLY_CAPTURED, $providerStatus);
     }
 
+    public function markPartiallyPaid(string $providerStatus): void
+    {
+        $this->applyTransition(AttemptStatus::PARTIALLY_PAID, $providerStatus);
+    }
+
     public function markSucceeded(string $providerStatus): void
     {
         $this->applyTransition(AttemptStatus::SUCCEEDED, $providerStatus);

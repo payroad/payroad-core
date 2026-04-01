@@ -8,6 +8,7 @@ use Payroad\Application\UseCase\Webhook\HandleWebhookUseCase;
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStatus;
 use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
+use Payroad\Domain\PaymentFlow\Crypto\CryptoPaymentAttempt;
 use Payroad\Domain\DomainEvent;
 use Payroad\Domain\Money\Currency;
 use Payroad\Domain\Money\Money;
@@ -22,6 +23,7 @@ use Payroad\Port\Repository\PaymentRepositoryInterface;
 use Payroad\Port\Provider\WebhookResult;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Stub\StubCryptoData;
 use Tests\Stub\StubSpecificData;
 
 final class HandleWebhookUseCaseTest extends TestCase
@@ -317,5 +319,37 @@ final class HandleWebhookUseCaseTest extends TestCase
         $this->payments->expects($this->never())->method('findById');
 
         $this->useCase->execute($this->makeCommand($result));
+    }
+
+    public function testExecuteHandlesPartiallyPaidWebhook(): void
+    {
+        $payment = $this->makePayment();
+
+        // PARTIALLY_PAID is only valid for the crypto flow.
+        $cryptoAttempt = CryptoPaymentAttempt::create(
+            PaymentAttemptId::generate(),
+            $payment->getId(),
+            'nowpayments',
+            Money::ofMinor(1000, new Currency('USD', 2)),
+            new StubCryptoData(),
+        );
+        $cryptoAttempt->setProviderReference('ref-crypto-123');
+        $cryptoAttempt->releaseEvents();
+
+        $result = new WebhookResult(
+            providerReference: 'ref-crypto-123',
+            newStatus: AttemptStatus::PARTIALLY_PAID,
+            providerStatus: 'partially_paid',
+            statusChanged: true,
+        );
+
+        $this->attempts->method('findByProviderReference')->willReturn($cryptoAttempt);
+
+        // PARTIALLY_PAID is not terminal — payment must not be touched.
+        $this->payments->expects($this->never())->method('findById');
+
+        $this->useCase->execute($this->makeCommand($result));
+
+        $this->assertSame(AttemptStatus::PARTIALLY_PAID, $cryptoAttempt->getStatus());
     }
 }
