@@ -239,8 +239,12 @@ final class AcmeCardProvider implements OneStepCardProviderInterface, Capturable
         // Always set the provider reference — used for capture, void, refund
         $attempt->setProviderReference($response['id']);
 
-        // For OneStep flow: attempt stays PENDING — Stripe.js confirms on the client,
-        // webhook transitions to SUCCEEDED later. No transition needed here.
+        // For OneStep flow (Stripe.js): the client confirms the charge via the SDK.
+        // The attempt stays PENDING here — webhook will transition it to SUCCEEDED later.
+        //
+        // If your API starts processing immediately on the server side (charge is in-flight
+        // but not yet settled), transition to PROCESSING instead:
+        //   $attempt->applyTransition(AttemptStatus::PROCESSING, $response['status']);
 
         return $attempt;
     }
