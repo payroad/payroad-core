@@ -216,7 +216,9 @@ Every state change produces typed events consumed by your application layer:
 
 ## Implementing a provider
 
-Create a Composer package and implement the port interface for your payment method:
+See **[docs/writing-a-provider.md](docs/writing-a-provider.md)** for a complete step-by-step guide covering data classes, provider implementation, factory, Symfony registration, and tests.
+
+Quick overview — create a Composer package and implement the port interface for your payment method:
 
 ```php
 use Payroad\Domain\Attempt\AttemptStatus;
