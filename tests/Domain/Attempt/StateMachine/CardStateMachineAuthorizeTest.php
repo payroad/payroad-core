@@ -72,14 +72,14 @@ final class CardStateMachineAuthorizeTest extends TestCase
         $this->assertFalse($this->sm->canTransition(AttemptStatus::AUTHORIZED, AttemptStatus::AWAITING_CONFIRMATION));
     }
 
-    // ── applyTransition records AttemptAuthorized event ──────────────────────
+    // ── markAuthorized records AttemptAuthorized event ──────────────────────
 
     public function testApplyTransitionToAuthorizedRecordsAttemptAuthorizedEvent(): void
     {
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->applyTransition(AttemptStatus::AUTHORIZED, 'authorized');
+        $attempt->markAuthorized('authorized');
 
         $events = $attempt->releaseEvents();
         $authorized = array_filter($events, fn($e) => $e instanceof AttemptAuthorized);
@@ -110,8 +110,8 @@ final class CardStateMachineAuthorizeTest extends TestCase
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->applyTransition(AttemptStatus::AUTHORIZED, 'authorized');
-        $attempt->applyTransition(AttemptStatus::SUCCEEDED, 'captured');
+        $attempt->markAuthorized('authorized');
+        $attempt->markSucceeded('captured');
 
         $this->assertSame(AttemptStatus::SUCCEEDED, $attempt->getStatus());
     }
@@ -121,8 +121,8 @@ final class CardStateMachineAuthorizeTest extends TestCase
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->applyTransition(AttemptStatus::AUTHORIZED, 'authorized');
-        $attempt->applyTransition(AttemptStatus::CANCELED, 'voided');
+        $attempt->markAuthorized('authorized');
+        $attempt->markCanceled('voided');
 
         $this->assertSame(AttemptStatus::CANCELED, $attempt->getStatus());
     }
@@ -131,7 +131,7 @@ final class CardStateMachineAuthorizeTest extends TestCase
     {
         $this->expectException(InvalidTransitionException::class);
         $attempt = $this->makeAttempt();
-        $attempt->applyTransition(AttemptStatus::AUTHORIZED, 'authorized');
-        $attempt->applyTransition(AttemptStatus::AUTHORIZED, 'authorized');
+        $attempt->markAuthorized('authorized');
+        $attempt->markAuthorized('authorized');
     }
 }

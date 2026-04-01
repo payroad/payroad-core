@@ -148,7 +148,7 @@ final class HandleRefundWebhookUseCaseTest extends TestCase
     {
         $payment = $this->makeSucceededPayment();
         $refund  = $this->makeRefund($payment);
-        $refund->applyTransition(RefundStatus::SUCCEEDED, 'succeeded');
+        $refund->markSucceeded('succeeded');
         $refund->releaseEvents();
 
         $this->refunds->method('findByProviderReference')->willReturn($refund);
@@ -169,7 +169,7 @@ final class HandleRefundWebhookUseCaseTest extends TestCase
     {
         $payment = $this->makeSucceededPayment();
         $refund  = $this->makeRefund($payment);
-        $refund->applyTransition(RefundStatus::SUCCEEDED, 'succeeded');
+        $refund->markSucceeded('succeeded');
         $refund->releaseEvents();
 
         $this->refunds->method('findByProviderReference')->willReturn($refund);

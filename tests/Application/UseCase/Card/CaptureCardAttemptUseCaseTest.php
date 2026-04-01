@@ -69,7 +69,7 @@ final class CaptureCardAttemptUseCaseTest extends TestCase
     {
         $attempt = CardPaymentAttempt::create(PaymentAttemptId::generate(), $paymentId, 'stub', Money::ofMinor(1000, new Currency('USD', 2)), new StubSpecificData());
         $attempt->setProviderReference('pi_abc123');
-        $attempt->applyTransition(AttemptStatus::AUTHORIZED, 'authorized');
+        $attempt->markAuthorized('authorized');
         $attempt->releaseEvents();
         return $attempt;
     }

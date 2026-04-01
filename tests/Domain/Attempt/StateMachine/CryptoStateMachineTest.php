@@ -90,7 +90,7 @@ final class CryptoStateMachineTest extends TestCase
         $this->assertFalse($this->sm->canTransition(AttemptStatus::SUCCEEDED, AttemptStatus::FAILED));
     }
 
-    // ── applyTransition on the attempt ───────────────────────────────────────
+    // ── semantic transition methods ───────────────────────────────────────
 
     public function testApplyTransitionOnAttemptThrowsOnInvalidTransition(): void
     {
@@ -98,7 +98,7 @@ final class CryptoStateMachineTest extends TestCase
 
         $this->expectException(InvalidTransitionException::class);
         // PENDING → AWAITING_CONFIRMATION is not a valid crypto transition
-        $attempt->applyTransition(AttemptStatus::AWAITING_CONFIRMATION, 'awaiting');
+        $attempt->markAwaitingConfirmation('awaiting');
     }
 
     public function testApplyTransitionOnAttemptAppliesValidTransition(): void
@@ -106,7 +106,7 @@ final class CryptoStateMachineTest extends TestCase
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
+        $attempt->markProcessing('processing');
 
         $this->assertSame(AttemptStatus::PROCESSING, $attempt->getStatus());
     }

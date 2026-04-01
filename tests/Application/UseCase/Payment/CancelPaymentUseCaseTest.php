@@ -135,7 +135,7 @@ final class CancelPaymentUseCaseTest extends TestCase
             Money::ofMinor(1000, new Currency('USD', 2)),
             new \Tests\Stub\StubSpecificData()
         );
-        $attempt->applyTransition(AttemptStatus::AUTHORIZED, 'authorized');
+        $attempt->markAuthorized('authorized');
         $attempt->releaseEvents();
 
         $this->payments->method('findById')->willReturn($payment);

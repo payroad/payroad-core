@@ -106,7 +106,7 @@ final class CardAttemptDataTest extends TestCase
         $data    = new StubSpecificData();
         $attempt = $this->makeAttempt($data);
 
-        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
+        $attempt->markProcessing('processing');
 
         $this->assertSame($data, $attempt->getData());
         $this->assertSame(AttemptStatus::PROCESSING, $attempt->getStatus());

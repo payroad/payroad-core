@@ -92,7 +92,7 @@ final class PaymentAttemptTest extends TestCase
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
+        $attempt->markProcessing('processing');
 
         $this->assertSame(AttemptStatus::PROCESSING, $attempt->getStatus());
         $this->assertSame('processing', $attempt->getProviderStatus());
@@ -103,7 +103,7 @@ final class PaymentAttemptTest extends TestCase
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
+        $attempt->markProcessing('processing');
         $events = $attempt->releaseEvents();
 
         $statusChangedEvents = array_filter($events, fn($e) => $e instanceof AttemptStatusChanged);
@@ -119,10 +119,10 @@ final class PaymentAttemptTest extends TestCase
     {
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
-        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
+        $attempt->markProcessing('processing');
         $attempt->releaseEvents();
 
-        $attempt->applyTransition(AttemptStatus::SUCCEEDED, 'succeeded');
+        $attempt->markSucceeded('succeeded');
         $events = $attempt->releaseEvents();
 
         $succeededEvents = array_filter($events, fn($e) => $e instanceof AttemptSucceeded);
@@ -134,7 +134,7 @@ final class PaymentAttemptTest extends TestCase
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->applyTransition(AttemptStatus::FAILED, 'failed', 'insufficient_funds');
+        $attempt->markFailed('failed', 'insufficient_funds');
         $events = $attempt->releaseEvents();
 
         $failedEvents = array_filter($events, fn($e) => $e instanceof AttemptFailed);
@@ -150,7 +150,7 @@ final class PaymentAttemptTest extends TestCase
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->applyTransition(AttemptStatus::AWAITING_CONFIRMATION, 'awaiting_confirmation');
+        $attempt->markAwaitingConfirmation('awaiting_confirmation');
         $events = $attempt->releaseEvents();
 
         $actionEvents = array_filter($events, fn($e) => $e instanceof AttemptRequiresUserAction);
@@ -163,9 +163,9 @@ final class PaymentAttemptTest extends TestCase
         $attempt->releaseEvents();
 
         // Card flow: CANCELED is reachable from AWAITING_CONFIRMATION
-        $attempt->applyTransition(AttemptStatus::AWAITING_CONFIRMATION, 'awaiting_confirmation');
+        $attempt->markAwaitingConfirmation('awaiting_confirmation');
         $attempt->releaseEvents();
-        $attempt->applyTransition(AttemptStatus::CANCELED, 'canceled');
+        $attempt->markCanceled('canceled');
         $events = $attempt->releaseEvents();
 
         $canceledEvents = array_filter($events, fn($e) => $e instanceof AttemptCanceled);
@@ -177,7 +177,7 @@ final class PaymentAttemptTest extends TestCase
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
+        $attempt->markProcessing('processing');
         $events = $attempt->releaseEvents();
 
         $succeededEvents = array_filter($events, fn($e) => $e instanceof AttemptSucceeded);

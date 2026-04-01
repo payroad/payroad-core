@@ -38,7 +38,7 @@ final class VoidCardAttemptUseCase
 
         $result = $provider->voidAttempt($attempt->getRequiredProviderReference());
 
-        $attempt->applyTransition($result->newStatus, $result->providerStatus);
+        $attempt->markCanceled($result->providerStatus);
 
         $this->attempts->save($attempt);
 

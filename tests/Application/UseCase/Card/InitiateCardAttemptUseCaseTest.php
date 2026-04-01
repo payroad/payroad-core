@@ -50,10 +50,11 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
 
         $this->cardProvider
             ->method('initiateCardAttempt')
-            ->willReturnCallback(
-                fn(PaymentAttemptId $id, PaymentId $paymentId, string $providerName, Money $amount) =>
-                    CardPaymentAttempt::create($id, $paymentId, 'stub', $amount, new StubSpecificData())
-            );
+            ->willReturnCallback(function (PaymentAttemptId $id, PaymentId $paymentId, string $providerName, Money $amount) {
+                $attempt = CardPaymentAttempt::create($id, $paymentId, 'stub', $amount, new StubSpecificData());
+                $attempt->setProviderReference('mock-ref-' . $id->value);
+                return $attempt;
+            });
 
         $this->providers->method('forCard')->willReturn($this->cardProvider);
         $this->attempts->method('nextId')->willReturn(PaymentAttemptId::generate());
@@ -119,10 +120,11 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
                 $this->isInstanceOf(Money::class),
                 $this->equalTo($context),
             )
-            ->willReturnCallback(
-                fn(PaymentAttemptId $id, PaymentId $paymentId, string $providerName, Money $amount) =>
-                    CardPaymentAttempt::create($id, $paymentId, 'stub', $amount, new StubSpecificData())
-            );
+            ->willReturnCallback(function (PaymentAttemptId $id, PaymentId $paymentId, string $providerName, Money $amount) {
+                $attempt = CardPaymentAttempt::create($id, $paymentId, 'stub', $amount, new StubSpecificData());
+                $attempt->setProviderReference('mock-ref-' . $id->value);
+                return $attempt;
+            });
 
         $this->useCase->execute($command);
     }
@@ -214,7 +216,7 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
     {
         $payment = $this->makePayment();
         $failed  = CardPaymentAttempt::create(PaymentAttemptId::generate(), $payment->getId(), 'stub', Money::ofMinor(1000, new Currency('USD', 2)), new StubSpecificData());
-        $failed->applyTransition(AttemptStatus::FAILED, 'failed');
+        $failed->markFailed('failed');
 
         $this->payments->method('findById')->willReturn($payment);
         $this->attempts->method('findByPaymentId')->willReturn([$failed]);

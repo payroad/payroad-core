@@ -189,7 +189,7 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
     {
         $payment = $this->makePayment();
         $failed  = CryptoPaymentAttempt::create(PaymentAttemptId::generate(), $payment->getId(), 'stub', Money::ofMinor(1000, new Currency('USD', 2)), new StubCryptoData());
-        $failed->applyTransition(AttemptStatus::FAILED, 'failed');
+        $failed->markFailed('failed');
 
         $this->payments->method('findById')->willReturn($payment);
         $this->attempts->method('findByPaymentId')->willReturn([$failed]);

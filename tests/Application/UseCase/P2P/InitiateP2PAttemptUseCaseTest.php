@@ -187,7 +187,7 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
     {
         $payment = $this->makePayment();
         $failed  = P2PPaymentAttempt::create(PaymentAttemptId::generate(), $payment->getId(), 'stub', Money::ofMinor(1000, new Currency('USD', 2)), new StubP2PData());
-        $failed->applyTransition(AttemptStatus::FAILED, 'failed');
+        $failed->markFailed('failed');
 
         $this->payments->method('findById')->willReturn($payment);
         $this->attempts->method('findByPaymentId')->willReturn([$failed]);

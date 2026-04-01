@@ -90,14 +90,14 @@ final class P2PStateMachineTest extends TestCase
         $this->assertFalse($this->sm->canTransition(AttemptStatus::FAILED, AttemptStatus::SUCCEEDED));
     }
 
-    // ── applyTransition on the attempt ───────────────────────────────────────
+    // ── semantic transition methods ───────────────────────────────────────
 
     public function testApplyTransitionOnAttemptThrowsOnInvalidTransition(): void
     {
         $attempt = $this->makeAttempt();
 
         $this->expectException(InvalidTransitionException::class);
-        $attempt->applyTransition(AttemptStatus::SUCCEEDED, 'succeeded');
+        $attempt->markSucceeded('succeeded');
     }
 
     public function testApplyTransitionOnAttemptAppliesValidTransition(): void
@@ -105,7 +105,7 @@ final class P2PStateMachineTest extends TestCase
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->applyTransition(AttemptStatus::AWAITING_CONFIRMATION, 'awaiting_confirmation');
+        $attempt->markAwaitingConfirmation('awaiting_confirmation');
 
         $this->assertSame(AttemptStatus::AWAITING_CONFIRMATION, $attempt->getStatus());
     }

@@ -4,7 +4,6 @@ namespace Payroad\Application\UseCase\Webhook;
 
 use Payroad\Application\Exception\AttemptNotFoundException;
 use Payroad\Application\Exception\PaymentNotFoundException;
-use Payroad\Domain\Attempt\AttemptStatus;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;
 use Payroad\Port\Repository\PaymentRepositoryInterface;
@@ -28,7 +27,17 @@ final class HandleWebhookUseCase
         // Skip if the attempt is already terminal — handles duplicate webhook delivery (at-least-once providers).
         $transitionApplied = false;
         if ($result->statusChanged && !$attempt->getStatus()->isTerminal()) {
-            $attempt->applyTransition($result->newStatus, $result->providerStatus, $result->reason);
+            match ($result->newStatus) {
+                \Payroad\Domain\Attempt\AttemptStatus::AUTHORIZED            => $attempt->markAuthorized($result->providerStatus),
+                \Payroad\Domain\Attempt\AttemptStatus::AWAITING_CONFIRMATION => $attempt->markAwaitingConfirmation($result->providerStatus),
+                \Payroad\Domain\Attempt\AttemptStatus::PROCESSING            => $attempt->markProcessing($result->providerStatus),
+                \Payroad\Domain\Attempt\AttemptStatus::PARTIALLY_CAPTURED    => $attempt->markPartiallyCaptured($result->providerStatus),
+                \Payroad\Domain\Attempt\AttemptStatus::SUCCEEDED             => $attempt->markSucceeded($result->providerStatus),
+                \Payroad\Domain\Attempt\AttemptStatus::FAILED                => $attempt->markFailed($result->providerStatus, $result->reason),
+                \Payroad\Domain\Attempt\AttemptStatus::CANCELED              => $attempt->markCanceled($result->providerStatus, $result->reason),
+                \Payroad\Domain\Attempt\AttemptStatus::EXPIRED               => $attempt->markExpired($result->providerStatus),
+                default => throw new \LogicException("Unexpected attempt status in webhook: {$result->newStatus->value}"),
+            };
             $transitionApplied = true;
         }
 

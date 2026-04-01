@@ -38,7 +38,12 @@ final class CaptureCardAttemptUseCase
 
         $result = $provider->captureAttempt($attempt->getRequiredProviderReference(), $command->amount);
 
-        $attempt->applyTransition($result->newStatus, $result->providerStatus);
+        match ($result->newStatus) {
+            \Payroad\Domain\Attempt\AttemptStatus::SUCCEEDED          => $attempt->markSucceeded($result->providerStatus),
+            \Payroad\Domain\Attempt\AttemptStatus::PROCESSING         => $attempt->markProcessing($result->providerStatus),
+            \Payroad\Domain\Attempt\AttemptStatus::PARTIALLY_CAPTURED => $attempt->markPartiallyCaptured($result->providerStatus),
+            default => throw new \LogicException("Unexpected capture result status: {$result->newStatus->value}"),
+        };
 
         $this->attempts->save($attempt);
 

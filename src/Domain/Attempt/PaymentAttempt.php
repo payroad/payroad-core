@@ -68,11 +68,53 @@ abstract class PaymentAttempt
 
     abstract protected function stateMachine(): AttemptStateMachineInterface;
 
+    // ── Semantic transition methods ───────────────────────────────────────────
+
+    public function markAuthorized(string $providerStatus): void
+    {
+        $this->applyTransition(AttemptStatus::AUTHORIZED, $providerStatus);
+    }
+
+    public function markAwaitingConfirmation(string $providerStatus): void
+    {
+        $this->applyTransition(AttemptStatus::AWAITING_CONFIRMATION, $providerStatus);
+    }
+
+    public function markProcessing(string $providerStatus): void
+    {
+        $this->applyTransition(AttemptStatus::PROCESSING, $providerStatus);
+    }
+
+    public function markPartiallyCaptured(string $providerStatus): void
+    {
+        $this->applyTransition(AttemptStatus::PARTIALLY_CAPTURED, $providerStatus);
+    }
+
+    public function markSucceeded(string $providerStatus): void
+    {
+        $this->applyTransition(AttemptStatus::SUCCEEDED, $providerStatus);
+    }
+
+    public function markFailed(string $providerStatus, string $reason = ''): void
+    {
+        $this->applyTransition(AttemptStatus::FAILED, $providerStatus, $reason);
+    }
+
+    public function markCanceled(string $providerStatus, string $reason = ''): void
+    {
+        $this->applyTransition(AttemptStatus::CANCELED, $providerStatus, $reason);
+    }
+
+    public function markExpired(string $providerStatus): void
+    {
+        $this->applyTransition(AttemptStatus::EXPIRED, $providerStatus);
+    }
+
     /**
      * Validates and applies a status transition via the embedded state machine.
      * Throws InvalidTransitionException if the transition is not allowed.
      */
-    public function applyTransition(
+    private function applyTransition(
         AttemptStatus $to,
         string        $providerStatus,
         string        $reason = ''
@@ -87,6 +129,12 @@ abstract class PaymentAttempt
     /** Called by the provider after the external API returns a reference. */
     public function setProviderReference(string $reference): void
     {
+        if (trim($reference) === '') {
+            throw new \InvalidArgumentException(
+                "Provider reference for attempt \"{$this->id->value}\" cannot be empty."
+            );
+        }
+
         $this->providerReference = $reference;
     }
 

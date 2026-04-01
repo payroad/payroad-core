@@ -26,7 +26,12 @@ final class HandleRefundWebhookUseCase
         // Skip if already terminal — handles duplicate webhook delivery (at-least-once providers).
         $transitionApplied = false;
         if ($result->statusChanged && !$refund->getStatus()->isTerminal()) {
-            $refund->applyTransition($result->newStatus, $result->providerStatus, $result->reason);
+            match ($result->newStatus) {
+                \Payroad\Domain\Refund\RefundStatus::PROCESSING => $refund->markProcessing($result->providerStatus),
+                \Payroad\Domain\Refund\RefundStatus::SUCCEEDED  => $refund->markSucceeded($result->providerStatus),
+                \Payroad\Domain\Refund\RefundStatus::FAILED     => $refund->markFailed($result->providerStatus, $result->reason),
+                default => throw new \LogicException("Unexpected refund status in webhook: {$result->newStatus->value}"),
+            };
             $transitionApplied = true;
         }
 

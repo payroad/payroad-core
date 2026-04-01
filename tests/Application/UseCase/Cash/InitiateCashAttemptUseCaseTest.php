@@ -187,7 +187,7 @@ final class InitiateCashAttemptUseCaseTest extends TestCase
     {
         $payment = $this->makePayment();
         $failed  = CashPaymentAttempt::create(PaymentAttemptId::generate(), $payment->getId(), 'stub', Money::ofMinor(1000, new Currency('USD', 2)), new StubCashData());
-        $failed->applyTransition(AttemptStatus::FAILED, 'failed');
+        $failed->markFailed('failed');
 
         $this->payments->method('findById')->willReturn($payment);
         $this->attempts->method('findByPaymentId')->willReturn([$failed]);

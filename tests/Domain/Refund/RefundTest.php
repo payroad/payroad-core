@@ -49,7 +49,7 @@ final class RefundTest extends TestCase
         $refund = $this->makeRefund();
         $refund->releaseEvents();
 
-        $refund->applyTransition(RefundStatus::PROCESSING, 'processing');
+        $refund->markProcessing('processing');
 
         $this->assertSame(RefundStatus::PROCESSING, $refund->getStatus());
     }
@@ -59,9 +59,9 @@ final class RefundTest extends TestCase
         $refund = $this->makeRefund();
         $refund->releaseEvents();
 
-        $refund->applyTransition(RefundStatus::PROCESSING, 'processing');
+        $refund->markProcessing('processing');
         $refund->releaseEvents();
-        $refund->applyTransition(RefundStatus::SUCCEEDED, 'succeeded');
+        $refund->markSucceeded('succeeded');
 
         $events = $refund->releaseEvents();
         $succeeded = array_filter($events, fn($e) => $e instanceof RefundSucceeded);
@@ -74,7 +74,7 @@ final class RefundTest extends TestCase
         $refund = $this->makeRefund();
         $refund->releaseEvents();
 
-        $refund->applyTransition(RefundStatus::FAILED, 'failed', 'insufficient_funds');
+        $refund->markFailed('failed', 'insufficient_funds');
 
         $events = $refund->releaseEvents();
         $failed = array_filter($events, fn($e) => $e instanceof RefundFailed);
@@ -85,19 +85,20 @@ final class RefundTest extends TestCase
     public function testCannotTransitionFromTerminalStatus(): void
     {
         $refund = $this->makeRefund();
-        $refund->applyTransition(RefundStatus::SUCCEEDED, 'succeeded');
+        $refund->markSucceeded('succeeded');
 
         $this->expectException(InvalidRefundTransitionException::class);
-        $refund->applyTransition(RefundStatus::FAILED, 'failed');
+        $refund->markFailed('failed');
     }
 
-    public function testCannotTransitionFromProcessingToPending(): void
+    public function testCannotTransitionBackFromProcessing(): void
     {
         $refund = $this->makeRefund();
-        $refund->applyTransition(RefundStatus::PROCESSING, 'processing');
+        $refund->markProcessing('processing');
+        $refund->markSucceeded('succeeded');
 
         $this->expectException(InvalidRefundTransitionException::class);
-        $refund->applyTransition(RefundStatus::PENDING, 'pending');
+        $refund->markProcessing('processing');
     }
 
     public function testSetProviderReference(): void

@@ -103,7 +103,7 @@ final class ThreeDSDataTest extends TestCase
         $attempt = $this->makeThreeDSAttempt();
         $attempt->releaseEvents();
 
-        $attempt->applyTransition(AttemptStatus::AWAITING_CONFIRMATION, 'awaiting_3ds');
+        $attempt->markAwaitingConfirmation('awaiting_3ds');
 
         $this->assertSame(AttemptStatus::AWAITING_CONFIRMATION, $attempt->getStatus());
         $this->assertNotNull($attempt->getData()->getThreeDSData());

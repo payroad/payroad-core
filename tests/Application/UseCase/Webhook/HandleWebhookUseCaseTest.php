@@ -70,7 +70,7 @@ final class HandleWebhookUseCaseTest extends TestCase
     private function makeProcessingAttempt(Payment $payment): CardPaymentAttempt
     {
         $attempt = $this->makePendingAttempt($payment);
-        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
+        $attempt->markProcessing('processing');
         $attempt->releaseEvents();
         return $attempt;
     }
@@ -160,7 +160,7 @@ final class HandleWebhookUseCaseTest extends TestCase
     {
         $payment = $this->makePayment();
         $attempt = $this->makePendingAttempt($payment);
-        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
+        $attempt->markProcessing('processing');
 
         $result = new WebhookResult(
             providerReference: 'ref-abc',
@@ -185,7 +185,7 @@ final class HandleWebhookUseCaseTest extends TestCase
         $attempt = $this->makeProcessingAttempt($payment);
 
         // First delivery: apply SUCCEEDED transition.
-        $attempt->applyTransition(AttemptStatus::SUCCEEDED, 'succeeded');
+        $attempt->markSucceeded('succeeded');
         $attempt->releaseEvents();
 
         // Second delivery: attempt is already terminal — must not throw.
@@ -280,7 +280,7 @@ final class HandleWebhookUseCaseTest extends TestCase
     {
         $payment = $this->makePayment();
         $attempt = $this->makeProcessingAttempt($payment);
-        $attempt->applyTransition(AttemptStatus::SUCCEEDED, 'succeeded');
+        $attempt->markSucceeded('succeeded');
         $attempt->releaseEvents();
 
         // Duplicate webhook: attempt already SUCCEEDED — transition must be skipped.

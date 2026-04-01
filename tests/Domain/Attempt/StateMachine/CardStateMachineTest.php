@@ -106,14 +106,14 @@ final class CardStateMachineTest extends TestCase
         $this->assertFalse($this->sm->canTransition(AttemptStatus::SUCCEEDED, AttemptStatus::FAILED));
     }
 
-    // ── applyTransition on the attempt ───────────────────────────────────────
+    // ── semantic transition methods ───────────────────────────────────────
 
     public function testApplyTransitionOnAttemptAppliesValidTransition(): void
     {
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->applyTransition(AttemptStatus::PROCESSING, 'processing');
+        $attempt->markProcessing('processing');
 
         $this->assertSame(AttemptStatus::PROCESSING, $attempt->getStatus());
         $this->assertSame('processing', $attempt->getProviderStatus());
@@ -124,6 +124,6 @@ final class CardStateMachineTest extends TestCase
         $attempt = $this->makeAttempt();
 
         $this->expectException(InvalidTransitionException::class);
-        $attempt->applyTransition(AttemptStatus::EXPIRED, 'expired'); // PENDING → EXPIRED is not allowed
+        $attempt->markExpired('expired'); // PENDING → EXPIRED is not allowed
     }
 }

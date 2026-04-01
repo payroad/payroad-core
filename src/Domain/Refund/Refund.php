@@ -67,11 +67,28 @@ abstract class Refund
 
     abstract protected function stateMachine(): RefundStateMachineInterface;
 
+    // ── Semantic transition methods ───────────────────────────────────────────
+
+    public function markProcessing(string $providerStatus): void
+    {
+        $this->applyTransition(RefundStatus::PROCESSING, $providerStatus);
+    }
+
+    public function markSucceeded(string $providerStatus): void
+    {
+        $this->applyTransition(RefundStatus::SUCCEEDED, $providerStatus);
+    }
+
+    public function markFailed(string $providerStatus, string $reason = ''): void
+    {
+        $this->applyTransition(RefundStatus::FAILED, $providerStatus, $reason);
+    }
+
     /**
      * Validates and applies a status transition via the embedded state machine.
      * Throws InvalidRefundTransitionException if the transition is not allowed.
      */
-    public function applyTransition(
+    private function applyTransition(
         RefundStatus $to,
         string       $providerStatus,
         string       $reason = ''

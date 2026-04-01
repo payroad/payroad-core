@@ -76,15 +76,15 @@ final class CashStateMachineTest extends TestCase
         $this->assertFalse($this->sm->canTransition(AttemptStatus::SUCCEEDED, AttemptStatus::EXPIRED));
     }
 
-    // ── applyTransition on the attempt ───────────────────────────────────────
+    // ── semantic transition methods ───────────────────────────────────────
 
     public function testApplyTransitionOnAttemptThrowsOnInvalidTransition(): void
     {
         $attempt = $this->makeAttempt();
-        $attempt->applyTransition(AttemptStatus::AWAITING_CONFIRMATION, 'awaiting_confirmation');
+        $attempt->markAwaitingConfirmation('awaiting_confirmation');
 
         $this->expectException(InvalidTransitionException::class);
-        $attempt->applyTransition(AttemptStatus::FAILED, 'failed');
+        $attempt->markFailed('failed');
     }
 
     public function testApplyTransitionOnAttemptAppliesValidTransition(): void
@@ -92,7 +92,7 @@ final class CashStateMachineTest extends TestCase
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
 
-        $attempt->applyTransition(AttemptStatus::AWAITING_CONFIRMATION, 'awaiting_confirmation');
+        $attempt->markAwaitingConfirmation('awaiting_confirmation');
 
         $this->assertSame(AttemptStatus::AWAITING_CONFIRMATION, $attempt->getStatus());
     }
