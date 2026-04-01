@@ -132,7 +132,7 @@ final class PaymentTest extends TestCase
         $this->assertTrue($payment->getSuccessfulAttemptId()->equals($attemptId));
     }
 
-    public function testMarkSucceededIsIdempotentWhenAlreadyTerminal(): void
+    public function testMarkSucceededIsIdempotentWhenAlreadySucceeded(): void
     {
         $payment   = $this->createPayment();
         $payment->releaseEvents();
@@ -141,9 +141,18 @@ final class PaymentTest extends TestCase
         $payment->markSucceeded($attemptId);
         $payment->releaseEvents();
 
-        // Should not throw, should be a no-op
+        // Second call with the same payment already SUCCEEDED — must be a no-op.
         $payment->markSucceeded(PaymentAttemptId::generate());
         $this->assertSame(PaymentStatus::SUCCEEDED, $payment->getStatus());
+    }
+
+    public function testMarkSucceededThrowsWhenPaymentIsInOtherTerminalStatus(): void
+    {
+        $payment = $this->createPayment();
+        $payment->markFailed();
+
+        $this->expectException(\DomainException::class);
+        $payment->markSucceeded(PaymentAttemptId::generate());
     }
 
     public function testMarkSucceededRecordsPaymentSucceededEvent(): void

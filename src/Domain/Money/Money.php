@@ -8,78 +8,104 @@ namespace Payroad\Domain\Money;
  * Works uniformly for fiat and crypto — the decimal precision is carried
  * by the Currency value object, not by Money itself.
  *
- * All arithmetic uses integer math to avoid floating-point errors.
+ * All arithmetic uses BCMath to handle the full range of supported currencies,
+ * including high-precision crypto such as ETH (18 decimals, ~10^18 wei per ETH).
  *
- * @see Currency for precision semantics and the ETH/wei overflow warning.
+ * @see Currency for precision semantics.
  */
 final readonly class Money
 {
     public function __construct(
-        private int      $minorAmount,
+        private string   $minorAmount,
         private Currency $currency
     ) {
-        if ($minorAmount < 0) {
+        if (bccomp($minorAmount, '0', 0) < 0) {
             throw new \InvalidArgumentException('Money amount cannot be negative.');
         }
     }
 
     public static function ofMinor(int $amount, Currency $currency): self
     {
-        return new self($amount, $currency);
+        return new self((string) $amount, $currency);
     }
 
     /**
-     * Constructs Money from a decimal string using bcmath.
+     * Constructs Money from a decimal string using BCMath.
      * The precision is taken from the Currency value object.
      *
-     * Prefer this factory for high-precision crypto amounts where the raw
-     * minor-unit value may approach PHP int range (e.g. large ETH amounts in wei).
+     * Safe for all currencies including ETH/wei — no integer cast, no overflow.
      */
     public static function ofDecimal(string $amount, Currency $currency): self
     {
         $exp   = $currency->precision;
-        $minor = (int) bcmul($amount, bcpow('10', (string) $exp, 0), 0);
+        $minor = bcmul($amount, bcpow('10', (string) $exp, 0), 0);
         return new self($minor, $currency);
     }
 
     public function add(self $other): self
     {
         $this->assertSameCurrency($other);
-        return new self($this->minorAmount + $other->minorAmount, $this->currency);
+        return new self(bcadd($this->minorAmount, $other->minorAmount, 0), $this->currency);
     }
 
     public function subtract(self $other): self
     {
         $this->assertSameCurrency($other);
 
-        if ($other->minorAmount > $this->minorAmount) {
+        if (bccomp($other->minorAmount, $this->minorAmount, 0) > 0) {
             throw new \InvalidArgumentException(
                 "Cannot subtract {$other->toDecimalString()} {$other->currency->code} "
                 . "from {$this->toDecimalString()} {$this->currency->code}: result would be negative."
             );
         }
 
-        return new self($this->minorAmount - $other->minorAmount, $this->currency);
+        return new self(bcsub($this->minorAmount, $other->minorAmount, 0), $this->currency);
     }
 
     public function isGreaterThan(self $other): bool
     {
         $this->assertSameCurrency($other);
-        return $this->minorAmount > $other->minorAmount;
+        return bccomp($this->minorAmount, $other->minorAmount, 0) > 0;
     }
 
     public function isZero(): bool
     {
-        return $this->minorAmount === 0;
+        return bccomp($this->minorAmount, '0', 0) === 0;
     }
 
     public function equals(self $other): bool
     {
-        return $this->minorAmount === $other->minorAmount
+        return bccomp($this->minorAmount, $other->minorAmount, 0) === 0
             && $this->currency->equals($other->currency);
     }
 
+    /**
+     * Returns the minor amount as a PHP int.
+     *
+     * Safe for fiat currencies and low-precision crypto (BTC=8, USDT=6).
+     * For ETH and other currencies where amounts may exceed PHP_INT_MAX,
+     * use getMinorAmountString() instead.
+     *
+     * @throws \OverflowException if the minor amount exceeds PHP_INT_MAX
+     */
     public function getMinorAmount(): int
+    {
+        if (bccomp($this->minorAmount, (string) PHP_INT_MAX, 0) > 0) {
+            throw new \OverflowException(
+                "Minor amount {$this->minorAmount} exceeds PHP_INT_MAX. "
+                . "Use getMinorAmountString() for high-precision currencies."
+            );
+        }
+        return (int) $this->minorAmount;
+    }
+
+    /**
+     * Returns the minor amount as a decimal string.
+     *
+     * Always safe — use this for crypto currencies with precision >= 10
+     * (e.g. ETH with precision=18) where the wei amount exceeds PHP_INT_MAX.
+     */
+    public function getMinorAmountString(): string
     {
         return $this->minorAmount;
     }
@@ -93,9 +119,9 @@ final readonly class Money
     {
         $exp = $this->currency->precision;
         if ($exp === 0) {
-            return (string) $this->minorAmount;
+            return $this->minorAmount;
         }
-        return bcdiv((string) $this->minorAmount, bcpow('10', (string) $exp, 0), $exp);
+        return bcdiv($this->minorAmount, bcpow('10', (string) $exp, 0), $exp);
     }
 
     private function assertSameCurrency(self $other): void

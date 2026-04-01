@@ -107,8 +107,15 @@ final class Payment
 
     public function markSucceeded(PaymentAttemptId $attemptId): void
     {
-        if ($this->status->isTerminal()) {
+        if ($this->status === PaymentStatus::SUCCEEDED) {
             return;
+        }
+
+        if ($this->status->isTerminal()) {
+            throw new \DomainException(
+                "Cannot mark payment \"{$this->id->value}\" as succeeded: "
+                . "already in terminal status \"{$this->status->value}\"."
+            );
         }
 
         $this->status              = PaymentStatus::SUCCEEDED;

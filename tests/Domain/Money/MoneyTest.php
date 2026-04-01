@@ -164,4 +164,44 @@ final class MoneyTest extends TestCase
         $money = Money::ofMinor(10500, $kwd);
         $this->assertSame('10.500', $money->toDecimalString());
     }
+
+    // ── High-precision crypto (ETH/wei overflow guard) ────────────────────────
+
+    public function testOfDecimalForEthDoesNotOverflow(): void
+    {
+        $eth   = new Currency('ETH', 18);
+        $money = Money::ofDecimal('100', $eth);
+        $this->assertSame('100000000000000000000', $money->getMinorAmountString());
+    }
+
+    public function testGetMinorAmountStringIsAlwaysSafe(): void
+    {
+        $eth   = new Currency('ETH', 18);
+        $money = Money::ofDecimal('10', $eth);
+        $this->assertSame('10000000000000000000', $money->getMinorAmountString());
+    }
+
+    public function testGetMinorAmountThrowsOverflowForLargeEthAmount(): void
+    {
+        $eth   = new Currency('ETH', 18);
+        $money = Money::ofDecimal('100', $eth);
+        $this->expectException(\OverflowException::class);
+        $money->getMinorAmount();
+    }
+
+    public function testAddWithLargeEthAmountsIsCorrect(): void
+    {
+        $eth = new Currency('ETH', 18);
+        $a   = Money::ofDecimal('50', $eth);
+        $b   = Money::ofDecimal('50', $eth);
+        $sum = $a->add($b);
+        $this->assertSame('100000000000000000000', $sum->getMinorAmountString());
+    }
+
+    public function testToDecimalStringForEthIsCorrect(): void
+    {
+        $eth   = new Currency('ETH', 18);
+        $money = Money::ofDecimal('1.5', $eth);
+        $this->assertSame('1.500000000000000000', $money->toDecimalString());
+    }
 }
