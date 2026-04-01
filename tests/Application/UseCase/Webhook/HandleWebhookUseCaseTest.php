@@ -321,6 +321,35 @@ final class HandleWebhookUseCaseTest extends TestCase
         $this->useCase->execute($this->makeCommand($result));
     }
 
+    public function testExecuteSkipsPaymentUpdateWhenPaymentAlreadyTerminalOnSuccessWebhook(): void
+    {
+        $payment = $this->makePayment();
+        $attempt = $this->makeProcessingAttempt($payment);
+
+        // Simulate race: payment was moved to FAILED concurrently.
+        $payment->markFailed();
+        $payment->releaseEvents();
+
+        $result = new WebhookResult(
+            providerReference: 'ref-abc',
+            newStatus: AttemptStatus::SUCCEEDED,
+            providerStatus: 'succeeded',
+            statusChanged: true,
+        );
+
+        $this->attempts->method('findByProviderReference')->willReturn($attempt);
+        $this->payments->method('findById')->willReturn($payment);
+
+        // Payment must not be saved — it's already terminal.
+        $this->payments->expects($this->never())->method('save');
+
+        $this->useCase->execute($this->makeCommand($result));
+
+        // Attempt transition was applied; payment stays FAILED.
+        $this->assertSame(AttemptStatus::SUCCEEDED, $attempt->getStatus());
+        $this->assertSame(PaymentStatus::FAILED, $payment->getStatus());
+    }
+
     public function testExecuteHandlesPartiallyPaidWebhook(): void
     {
         $payment = $this->makePayment();

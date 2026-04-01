@@ -47,6 +47,19 @@ final class ChargeCardWithNonceUseCase
             );
         }
 
+        if ($attempt->getStatus() !== \Payroad\Domain\Attempt\AttemptStatus::PENDING) {
+            throw new \DomainException(
+                "Cannot charge attempt \"{$command->attemptId->value}\": must be PENDING (current: {$attempt->getStatus()->value})."
+            );
+        }
+
+        if (!$command->amount->equals($attempt->getAmount())) {
+            throw new \DomainException(
+                "Charge amount {$command->amount->toDecimalString()} {$command->amount->getCurrency()->code} "
+                . "does not match attempt amount {$attempt->getAmount()->toDecimalString()} {$attempt->getAmount()->getCurrency()->code}."
+            );
+        }
+
         $result = $provider->chargeWithNonce($command->nonce, $command->amount);
 
         // Replace the temporary placeholder reference with the real transaction ID.

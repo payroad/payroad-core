@@ -198,4 +198,32 @@ final class ChargeCardWithNonceUseCaseTest extends TestCase
 
         $this->useCase->execute($this->makeCommand($attempt));
     }
+
+    public function testExecuteThrowsWhenAttemptIsNotPending(): void
+    {
+        $payment = $this->makePayment();
+        $attempt = $this->makePendingAttempt($payment);
+        $attempt->markProcessing('processing');
+
+        $this->attempts->method('findById')->willReturn($attempt);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessageMatches('/must be PENDING/');
+        $this->useCase->execute($this->makeCommand($attempt));
+    }
+
+    public function testExecuteThrowsWhenAmountDoesNotMatchAttempt(): void
+    {
+        $payment = $this->makePayment();
+        $attempt = $this->makePendingAttempt($payment);
+
+        $this->attempts->method('findById')->willReturn($attempt);
+
+        $wrongAmount = Money::ofMinor(999, new Currency('USD', 2));
+        $command = new ChargeCardWithNonceCommand($attempt->getId(), 'nonce', $wrongAmount);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessageMatches('/does not match attempt amount/');
+        $this->useCase->execute($command);
+    }
 }

@@ -93,12 +93,14 @@ final class CardPaymentAttempt extends PaymentAttempt
         $this->getRequiredProviderReference();
     }
 
-    /** @throws \DomainException if the attempt is not AUTHORIZED, amount exceeds authorized, or has no provider reference */
+    /** @throws \DomainException if the attempt cannot be captured or the amount exceeds the authorized amount */
     public function assertCanBeCaptured(?Money $captureAmount): void
     {
-        if ($this->getStatus() !== AttemptStatus::AUTHORIZED) {
+        $capturable = [AttemptStatus::AUTHORIZED, AttemptStatus::PARTIALLY_CAPTURED];
+
+        if (!in_array($this->getStatus(), $capturable, true)) {
             throw new \DomainException(
-                "Cannot capture attempt \"{$this->getId()->value}\": must be AUTHORIZED (current: {$this->getStatus()->value})."
+                "Cannot capture attempt \"{$this->getId()->value}\": must be AUTHORIZED or PARTIALLY_CAPTURED (current: {$this->getStatus()->value})."
             );
         }
         if ($captureAmount !== null && $captureAmount->isGreaterThan($this->getAmount())) {

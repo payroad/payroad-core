@@ -64,6 +64,13 @@ final class HandleWebhookUseCase
                 ?? throw new PaymentNotFoundException($attempt->getPaymentId());
 
             if ($result->newStatus->isSuccess()) {
+                // Guard against race condition: payment may have been moved to a different
+                // terminal status (e.g. FAILED via FailPaymentUseCase) between the attempt
+                // succeeding and this webhook being processed. Silently skip — the attempt
+                // transition was already applied and persisted above.
+                if ($payment->getStatus()->isTerminal()) {
+                    return;
+                }
                 $payment->markSucceeded($attempt->getId());
             } else {
                 $payment->markRetryable();
