@@ -8,7 +8,7 @@ use Payroad\Domain\Attempt\PaymentAttempt;
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStateMachineInterface;
 use Payroad\Domain\Attempt\AttemptData;
-use Payroad\Domain\Attempt\Event\AttemptAuthorized;
+use Payroad\Domain\Channel\Card\Event\AttemptAuthorized;
 use Payroad\Domain\Attempt\Event\AttemptInitiated;
 use Payroad\Domain\Channel\Card\Event\AttemptRequiresConfirmation;
 use Payroad\Domain\DomainEvent;

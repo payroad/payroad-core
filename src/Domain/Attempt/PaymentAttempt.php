@@ -69,7 +69,7 @@ abstract class PaymentAttempt
 
     /**
      * Override in channel subclasses to emit channel-specific semantic events
-     * (e.g. AttemptAuthorized for Card, AttemptPartiallyCaptured for Card, AttemptPartiallyPaid for Crypto).
+     * (e.g. AttemptAuthorized (Card), AttemptPartiallyCaptured (Card), AttemptPartiallyPaid (Crypto)).
      * Base implementation returns null (no event) for statuses not handled above.
      */
     protected function channelSemanticEvent(AttemptStatus $status): ?DomainEvent

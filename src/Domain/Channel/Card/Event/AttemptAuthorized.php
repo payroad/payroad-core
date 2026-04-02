@@ -1,6 +1,6 @@
 <?php
 
-namespace Payroad\Domain\Attempt\Event;
+namespace Payroad\Domain\Channel\Card\Event;
 
 use Payroad\Domain\AbstractDomainEvent;
 use Payroad\Domain\Attempt\PaymentAttemptId;
