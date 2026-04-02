@@ -68,14 +68,11 @@ abstract class PaymentAttempt
     abstract protected function stateMachine(): AttemptStateMachineInterface;
 
     /**
-     * Override in channel subclasses to emit channel-specific semantic events
-     * (e.g. AttemptAuthorized (Card), AttemptPartiallyCaptured (Card), AttemptPartiallyPaid (Crypto)).
-     * Base implementation returns null (no event) for statuses not handled above.
+     * Emit channel-specific semantic events for statuses not handled by the base match.
+     * Return null if the status has no additional semantic event for this channel.
+     * Every channel subclass must implement this explicitly — no silent omission.
      */
-    protected function channelSemanticEvent(AttemptStatus $status): ?DomainEvent
-    {
-        return null;
-    }
+    abstract protected function channelSemanticEvent(AttemptStatus $status): ?DomainEvent;
 
     // ── Semantic transition methods ───────────────────────────────────────────
 

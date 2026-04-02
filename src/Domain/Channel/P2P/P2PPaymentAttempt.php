@@ -88,7 +88,7 @@ final class P2PPaymentAttempt extends PaymentAttempt
     {
         return match ($status) {
             AttemptStatus::AWAITING_CONFIRMATION => new AttemptAwaitingTransfer($this->getId(), $this->getPaymentId()),
-            default                              => null,
+            default                              => null, // no semantic event for other P2P statuses
         };
     }
 
