@@ -9,6 +9,8 @@ use Payroad\Domain\Attempt\AttemptStateMachineInterface;
 use Payroad\Domain\Attempt\AttemptData;
 use Payroad\Domain\Attempt\Event\AttemptInitiated;
 use Payroad\Domain\Attempt\PaymentAttempt;
+use Payroad\Domain\Channel\P2P\Event\AttemptAwaitingTransfer;
+use Payroad\Domain\DomainEvent;
 use Payroad\Domain\PaymentMethodType;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
@@ -80,6 +82,14 @@ final class P2PPaymentAttempt extends PaymentAttempt
     public function getData(): P2PAttemptData
     {
         return $this->data;
+    }
+
+    protected function channelSemanticEvent(AttemptStatus $status): ?DomainEvent
+    {
+        return match ($status) {
+            AttemptStatus::AWAITING_CONFIRMATION => new AttemptAwaitingTransfer($this->getId(), $this->getPaymentId()),
+            default                              => null,
+        };
     }
 
     public function updateP2PData(P2PAttemptData $data): void

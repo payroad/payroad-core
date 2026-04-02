@@ -10,6 +10,7 @@ use Payroad\Domain\Attempt\AttemptStateMachineInterface;
 use Payroad\Domain\Attempt\AttemptData;
 use Payroad\Domain\Attempt\Event\AttemptAuthorized;
 use Payroad\Domain\Attempt\Event\AttemptInitiated;
+use Payroad\Domain\Channel\Card\Event\AttemptRequiresConfirmation;
 use Payroad\Domain\DomainEvent;
 use Payroad\Domain\PaymentMethodType;
 use Payroad\Domain\Money\Money;
@@ -132,8 +133,9 @@ final class CardPaymentAttempt extends PaymentAttempt
     protected function channelSemanticEvent(AttemptStatus $status): ?DomainEvent
     {
         return match ($status) {
-            AttemptStatus::AUTHORIZED => new AttemptAuthorized($this->getId(), $this->getPaymentId(), $this->getMethodType()),
-            default                   => null,
+            AttemptStatus::AUTHORIZED            => new AttemptAuthorized($this->getId(), $this->getPaymentId(), $this->getMethodType()),
+            AttemptStatus::AWAITING_CONFIRMATION => new AttemptRequiresConfirmation($this->getId(), $this->getPaymentId()),
+            default                              => null,
         };
     }
 

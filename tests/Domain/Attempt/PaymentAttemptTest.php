@@ -9,9 +9,9 @@ use Payroad\Domain\Attempt\PaymentAttempt;
 use Payroad\Domain\Attempt\Event\AttemptCanceled;
 use Payroad\Domain\Attempt\Event\AttemptFailed;
 use Payroad\Domain\Attempt\Event\AttemptInitiated;
-use Payroad\Domain\Attempt\Event\AttemptRequiresUserAction;
 use Payroad\Domain\Attempt\Event\AttemptStatusChanged;
 use Payroad\Domain\Attempt\Event\AttemptSucceeded;
+use Payroad\Domain\Channel\Card\Event\AttemptRequiresConfirmation;
 use Payroad\Domain\Money\Currency;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\CustomerId;
@@ -145,7 +145,7 @@ final class PaymentAttemptTest extends TestCase
         $this->assertSame('insufficient_funds', $event->reason);
     }
 
-    public function testApplyTransitionToAwaitingConfirmationRecordsAttemptRequiresUserActionEvent(): void
+    public function testApplyTransitionToAwaitingConfirmationRecordsAttemptRequiresConfirmationEvent(): void
     {
         $attempt = $this->makeAttempt();
         $attempt->releaseEvents();
@@ -153,7 +153,7 @@ final class PaymentAttemptTest extends TestCase
         $attempt->markAwaitingConfirmation('awaiting_confirmation');
         $events = $attempt->releaseEvents();
 
-        $actionEvents = array_filter($events, fn($e) => $e instanceof AttemptRequiresUserAction);
+        $actionEvents = array_filter($events, fn($e) => $e instanceof AttemptRequiresConfirmation);
         $this->assertCount(1, $actionEvents);
     }
 

@@ -10,7 +10,6 @@ use Payroad\Domain\Attempt\Event\AttemptCanceled;
 use Payroad\Domain\DomainEvent;
 use Payroad\Domain\Attempt\Event\AttemptExpired;
 use Payroad\Domain\Attempt\Event\AttemptFailed;
-use Payroad\Domain\Attempt\Event\AttemptRequiresUserAction;
 use Payroad\Domain\Attempt\Event\AttemptStatusChanged;
 use Payroad\Domain\Attempt\Event\AttemptSucceeded;
 use Payroad\Domain\Attempt\Exception\InvalidTransitionException;
@@ -137,7 +136,6 @@ abstract class PaymentAttempt
         if (!$this->stateMachine()->canTransition($this->status, $to)) {
             throw new InvalidTransitionException($this->status, $to, $this->getMethodType()->value);
         }
-
         $this->doTransition($to, $providerStatus, $reason);
     }
 
@@ -199,8 +197,7 @@ abstract class PaymentAttempt
         ));
 
         $semanticEvent = match ($newStatus) {
-            AttemptStatus::AWAITING_CONFIRMATION => new AttemptRequiresUserAction($this->id, $this->paymentId, $this->getMethodType()),
-            AttemptStatus::SUCCEEDED             => new AttemptSucceeded($this->id, $this->paymentId, $this->getMethodType()),
+            AttemptStatus::SUCCEEDED => new AttemptSucceeded($this->id, $this->paymentId, $this->getMethodType()),
             AttemptStatus::FAILED                => new AttemptFailed($this->id, $this->paymentId, $this->getMethodType(), $reason),
             AttemptStatus::CANCELED              => new AttemptCanceled($this->id, $this->paymentId, $this->getMethodType(), $reason),
             AttemptStatus::EXPIRED               => new AttemptExpired($this->id, $this->paymentId, $this->getMethodType()),

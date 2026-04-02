@@ -9,6 +9,8 @@ use Payroad\Domain\Attempt\AttemptStateMachineInterface;
 use Payroad\Domain\Attempt\AttemptData;
 use Payroad\Domain\Attempt\Event\AttemptInitiated;
 use Payroad\Domain\Attempt\PaymentAttempt;
+use Payroad\Domain\Channel\Cash\Event\AttemptAwaitingCashPayment;
+use Payroad\Domain\DomainEvent;
 use Payroad\Domain\PaymentMethodType;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
@@ -80,6 +82,14 @@ final class CashPaymentAttempt extends PaymentAttempt
     public function getData(): CashAttemptData
     {
         return $this->data;
+    }
+
+    protected function channelSemanticEvent(AttemptStatus $status): ?DomainEvent
+    {
+        return match ($status) {
+            AttemptStatus::AWAITING_CONFIRMATION => new AttemptAwaitingCashPayment($this->getId(), $this->getPaymentId()),
+            default                              => null,
+        };
     }
 
     public function updateCashData(CashAttemptData $data): void
