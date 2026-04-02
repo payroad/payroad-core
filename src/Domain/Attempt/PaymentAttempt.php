@@ -6,8 +6,8 @@ use DateTimeImmutable;
 use Payroad\Domain\AggregateRootTrait;
 use Payroad\Domain\Attempt\AttemptStateMachineInterface;
 use Payroad\Domain\Attempt\AttemptData;
-use Payroad\Domain\Attempt\Event\AttemptAuthorized;
 use Payroad\Domain\Attempt\Event\AttemptCanceled;
+use Payroad\Domain\DomainEvent;
 use Payroad\Domain\Attempt\Event\AttemptExpired;
 use Payroad\Domain\Attempt\Event\AttemptFailed;
 use Payroad\Domain\Attempt\Event\AttemptRequiresUserAction;
@@ -67,6 +67,16 @@ abstract class PaymentAttempt
     abstract public function updateSpecificData(AttemptData $data): void;
 
     abstract protected function stateMachine(): AttemptStateMachineInterface;
+
+    /**
+     * Override in channel subclasses to emit channel-specific semantic events
+     * (e.g. AttemptAuthorized for Card, AttemptPartiallyCaptured for Card, AttemptPartiallyPaid for Crypto).
+     * Base implementation returns null (no event) for statuses not handled above.
+     */
+    protected function channelSemanticEvent(AttemptStatus $status): ?DomainEvent
+    {
+        return null;
+    }
 
     // ── Semantic transition methods ───────────────────────────────────────────
 
@@ -189,13 +199,12 @@ abstract class PaymentAttempt
         ));
 
         $semanticEvent = match ($newStatus) {
-            AttemptStatus::AUTHORIZED            => new AttemptAuthorized($this->id, $this->paymentId, $this->getMethodType()),
             AttemptStatus::AWAITING_CONFIRMATION => new AttemptRequiresUserAction($this->id, $this->paymentId, $this->getMethodType()),
             AttemptStatus::SUCCEEDED             => new AttemptSucceeded($this->id, $this->paymentId, $this->getMethodType()),
             AttemptStatus::FAILED                => new AttemptFailed($this->id, $this->paymentId, $this->getMethodType(), $reason),
             AttemptStatus::CANCELED              => new AttemptCanceled($this->id, $this->paymentId, $this->getMethodType(), $reason),
             AttemptStatus::EXPIRED               => new AttemptExpired($this->id, $this->paymentId, $this->getMethodType()),
-            default                              => null,
+            default                              => $this->channelSemanticEvent($newStatus),
         };
 
         if ($semanticEvent !== null) {

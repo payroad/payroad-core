@@ -8,7 +8,9 @@ use Payroad\Domain\Attempt\PaymentAttempt;
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStateMachineInterface;
 use Payroad\Domain\Attempt\AttemptData;
+use Payroad\Domain\Attempt\Event\AttemptAuthorized;
 use Payroad\Domain\Attempt\Event\AttemptInitiated;
+use Payroad\Domain\DomainEvent;
 use Payroad\Domain\PaymentMethodType;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
@@ -125,6 +127,14 @@ final class CardPaymentAttempt extends PaymentAttempt
     public function updateCardData(CardAttemptData $data): void
     {
         $this->data = $data;
+    }
+
+    protected function channelSemanticEvent(AttemptStatus $status): ?DomainEvent
+    {
+        return match ($status) {
+            AttemptStatus::AUTHORIZED => new AttemptAuthorized($this->getId(), $this->getPaymentId(), $this->getMethodType()),
+            default                   => null,
+        };
     }
 
     public function updateSpecificData(AttemptData $data): void
