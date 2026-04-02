@@ -130,6 +130,16 @@ final class CardPaymentAttempt extends PaymentAttempt
         $this->data = $data;
     }
 
+    public function markAuthorized(string $providerStatus): void
+    {
+        $this->applyWebhookTransition(AttemptStatus::AUTHORIZED, $providerStatus);
+    }
+
+    public function markPartiallyCaptured(string $providerStatus): void
+    {
+        $this->applyWebhookTransition(AttemptStatus::PARTIALLY_CAPTURED, $providerStatus);
+    }
+
     protected function channelSemanticEvent(AttemptStatus $status): ?DomainEvent
     {
         return match ($status) {

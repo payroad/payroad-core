@@ -79,11 +79,6 @@ abstract class PaymentAttempt
 
     // ── Semantic transition methods ───────────────────────────────────────────
 
-    public function markAuthorized(string $providerStatus): void
-    {
-        $this->applyTransition(AttemptStatus::AUTHORIZED, $providerStatus);
-    }
-
     public function markAwaitingConfirmation(string $providerStatus): void
     {
         $this->applyTransition(AttemptStatus::AWAITING_CONFIRMATION, $providerStatus);
@@ -92,16 +87,6 @@ abstract class PaymentAttempt
     public function markProcessing(string $providerStatus): void
     {
         $this->applyTransition(AttemptStatus::PROCESSING, $providerStatus);
-    }
-
-    public function markPartiallyCaptured(string $providerStatus): void
-    {
-        $this->applyTransition(AttemptStatus::PARTIALLY_CAPTURED, $providerStatus);
-    }
-
-    public function markPartiallyPaid(string $providerStatus): void
-    {
-        $this->applyTransition(AttemptStatus::PARTIALLY_PAID, $providerStatus);
     }
 
     public function markSucceeded(string $providerStatus): void
@@ -122,6 +107,18 @@ abstract class PaymentAttempt
     public function markExpired(string $providerStatus): void
     {
         $this->applyTransition(AttemptStatus::EXPIRED, $providerStatus);
+    }
+
+    /**
+     * Generic transition entry point used by the webhook handler.
+     * Channel-specific mark methods (markAuthorized, markPartiallyCaptured, markPartiallyPaid)
+     * live on concrete subclasses and are called directly when the type is known.
+     * This method handles all statuses uniformly — the embedded state machine rejects
+     * transitions that are invalid for the channel.
+     */
+    public function applyWebhookTransition(AttemptStatus $to, string $providerStatus, string $reason = ''): void
+    {
+        $this->applyTransition($to, $providerStatus, $reason);
     }
 
     /**
