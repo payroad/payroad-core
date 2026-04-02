@@ -109,23 +109,11 @@ abstract class PaymentAttempt
         $this->applyTransition(AttemptStatus::EXPIRED, $providerStatus);
     }
 
-    /**
-     * Generic transition entry point used by the webhook handler.
-     * Channel-specific mark methods (markAuthorized, markPartiallyCaptured, markPartiallyPaid)
-     * live on concrete subclasses and are called directly when the type is known.
-     * This method handles all statuses uniformly — the embedded state machine rejects
-     * transitions that are invalid for the channel.
-     */
-    public function applyWebhookTransition(AttemptStatus $to, string $providerStatus, string $reason = ''): void
-    {
-        $this->applyTransition($to, $providerStatus, $reason);
-    }
-
-    /**
+/**
      * Validates and applies a status transition via the embedded state machine.
      * Throws InvalidTransitionException if the transition is not allowed.
      */
-    private function applyTransition(
+    protected function applyTransition(
         AttemptStatus $to,
         string        $providerStatus,
         string        $reason = ''

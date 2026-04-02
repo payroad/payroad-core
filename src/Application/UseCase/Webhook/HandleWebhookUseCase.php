@@ -4,7 +4,14 @@ namespace Payroad\Application\UseCase\Webhook;
 
 use Payroad\Application\Exception\AttemptNotFoundException;
 use Payroad\Application\Exception\PaymentNotFoundException;
+use Payroad\Domain\Attempt\AttemptStatus;
+use Payroad\Domain\Channel\Card\CardPaymentAttempt;
+use Payroad\Domain\Channel\Cash\CashPaymentAttempt;
+use Payroad\Domain\Channel\Crypto\CryptoPaymentAttempt;
+use Payroad\Domain\Channel\P2P\P2PPaymentAttempt;
+use Payroad\Domain\PaymentMethodType;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
+use Payroad\Port\Provider\WebhookResult;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;
 use Payroad\Port\Repository\PaymentRepositoryInterface;
 
@@ -27,7 +34,7 @@ final class HandleWebhookUseCase
         // Skip if the attempt is already terminal — handles duplicate webhook delivery (at-least-once providers).
         $transitionApplied = false;
         if ($result->statusChanged && !$attempt->getStatus()->isTerminal()) {
-            $attempt->applyWebhookTransition($result->newStatus, $result->providerStatus, $result->reason);
+            $this->applyChannelTransition($attempt, $result);
             $transitionApplied = true;
         }
 
@@ -68,5 +75,68 @@ final class HandleWebhookUseCase
             $this->payments->save($payment);
             $this->dispatcher->dispatch(...$payment->releaseEvents());
         }
+    }
+
+    private function applyChannelTransition(\Payroad\Domain\Attempt\PaymentAttempt $attempt, WebhookResult $result): void
+    {
+        match ($attempt->getMethodType()) {
+            PaymentMethodType::CARD   => $this->applyCardTransition(CardPaymentAttempt::fromAttempt($attempt), $result),
+            PaymentMethodType::CRYPTO => $this->applyCryptoTransition(CryptoPaymentAttempt::fromAttempt($attempt), $result),
+            PaymentMethodType::P2P    => $this->applyP2PTransition(P2PPaymentAttempt::fromAttempt($attempt), $result),
+            PaymentMethodType::CASH   => $this->applyCashTransition(CashPaymentAttempt::fromAttempt($attempt), $result),
+        };
+    }
+
+    private function applyCardTransition(CardPaymentAttempt $attempt, WebhookResult $result): void
+    {
+        match ($result->newStatus) {
+            AttemptStatus::AUTHORIZED            => $attempt->markAuthorized($result->providerStatus),
+            AttemptStatus::AWAITING_CONFIRMATION => $attempt->markAwaitingConfirmation($result->providerStatus),
+            AttemptStatus::PROCESSING            => $attempt->markProcessing($result->providerStatus),
+            AttemptStatus::PARTIALLY_CAPTURED    => $attempt->markPartiallyCaptured($result->providerStatus),
+            AttemptStatus::SUCCEEDED             => $attempt->markSucceeded($result->providerStatus),
+            AttemptStatus::FAILED                => $attempt->markFailed($result->providerStatus, $result->reason),
+            AttemptStatus::CANCELED              => $attempt->markCanceled($result->providerStatus, $result->reason),
+            AttemptStatus::EXPIRED               => $attempt->markExpired($result->providerStatus),
+            default => throw new \LogicException("Unexpected status for card webhook: {$result->newStatus->value}"),
+        };
+    }
+
+    private function applyCryptoTransition(CryptoPaymentAttempt $attempt, WebhookResult $result): void
+    {
+        match ($result->newStatus) {
+            AttemptStatus::AWAITING_CONFIRMATION => $attempt->markAwaitingConfirmation($result->providerStatus),
+            AttemptStatus::PROCESSING            => $attempt->markProcessing($result->providerStatus),
+            AttemptStatus::PARTIALLY_PAID        => $attempt->markPartiallyPaid($result->providerStatus),
+            AttemptStatus::SUCCEEDED             => $attempt->markSucceeded($result->providerStatus),
+            AttemptStatus::FAILED                => $attempt->markFailed($result->providerStatus, $result->reason),
+            AttemptStatus::CANCELED              => $attempt->markCanceled($result->providerStatus, $result->reason),
+            AttemptStatus::EXPIRED               => $attempt->markExpired($result->providerStatus),
+            default => throw new \LogicException("Unexpected status for crypto webhook: {$result->newStatus->value}"),
+        };
+    }
+
+    private function applyP2PTransition(P2PPaymentAttempt $attempt, WebhookResult $result): void
+    {
+        match ($result->newStatus) {
+            AttemptStatus::AWAITING_CONFIRMATION => $attempt->markAwaitingConfirmation($result->providerStatus),
+            AttemptStatus::PROCESSING            => $attempt->markProcessing($result->providerStatus),
+            AttemptStatus::SUCCEEDED             => $attempt->markSucceeded($result->providerStatus),
+            AttemptStatus::FAILED                => $attempt->markFailed($result->providerStatus, $result->reason),
+            AttemptStatus::CANCELED              => $attempt->markCanceled($result->providerStatus, $result->reason),
+            AttemptStatus::EXPIRED               => $attempt->markExpired($result->providerStatus),
+            default => throw new \LogicException("Unexpected status for P2P webhook: {$result->newStatus->value}"),
+        };
+    }
+
+    private function applyCashTransition(CashPaymentAttempt $attempt, WebhookResult $result): void
+    {
+        match ($result->newStatus) {
+            AttemptStatus::AWAITING_CONFIRMATION => $attempt->markAwaitingConfirmation($result->providerStatus),
+            AttemptStatus::SUCCEEDED             => $attempt->markSucceeded($result->providerStatus),
+            AttemptStatus::FAILED                => $attempt->markFailed($result->providerStatus, $result->reason),
+            AttemptStatus::EXPIRED               => $attempt->markExpired($result->providerStatus),
+            default => throw new \LogicException("Unexpected status for cash webhook: {$result->newStatus->value}"),
+        };
     }
 }

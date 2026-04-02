@@ -86,7 +86,7 @@ final class CryptoPaymentAttempt extends PaymentAttempt
 
     public function markPartiallyPaid(string $providerStatus): void
     {
-        $this->applyWebhookTransition(AttemptStatus::PARTIALLY_PAID, $providerStatus);
+        $this->applyTransition(AttemptStatus::PARTIALLY_PAID, $providerStatus);
     }
 
     protected function channelSemanticEvent(AttemptStatus $status): ?DomainEvent

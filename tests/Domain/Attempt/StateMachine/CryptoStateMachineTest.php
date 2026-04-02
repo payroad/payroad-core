@@ -127,11 +127,12 @@ final class CryptoStateMachineTest extends TestCase
     public function testApplyTransitionOnAttemptThrowsOnInvalidTransition(): void
     {
         $attempt = $this->makeAttempt();
-        $attempt->markAwaitingConfirmation('waiting');
+        $attempt->markProcessing('processing');
+        $attempt->markSucceeded('succeeded');
+        $attempt->releaseEvents();
 
         $this->expectException(InvalidTransitionException::class);
-        // AWAITING_CONFIRMATION → PROCESSING → SUCCEEDED is valid; AWAITING_CONFIRMATION → SUCCEEDED directly is not
-        $attempt->applyWebhookTransition(\Payroad\Domain\Attempt\AttemptStatus::AUTHORIZED, 'authorized');
+        $attempt->markFailed('failed'); // terminal → any transition is invalid
     }
 
     public function testApplyTransitionOnAttemptAppliesValidTransition(): void
