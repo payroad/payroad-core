@@ -2,8 +2,8 @@
 
 namespace Tests\Stub;
 
-use Payroad\Domain\PaymentFlow\Card\CardAttemptData;
-use Payroad\Domain\PaymentFlow\Card\ThreeDSData;
+use Payroad\Domain\Channel\Card\CardAttemptData;
+use Payroad\Domain\Channel\Card\ThreeDSData;
 
 final class StubSpecificData implements CardAttemptData
 {

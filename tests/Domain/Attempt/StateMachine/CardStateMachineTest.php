@@ -4,8 +4,8 @@ namespace Tests\Domain\Attempt\StateMachine;
 
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStatus;
-use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
-use Payroad\Domain\PaymentFlow\Card\CardStateMachine;
+use Payroad\Domain\Channel\Card\CardPaymentAttempt;
+use Payroad\Domain\Channel\Card\CardStateMachine;
 use Payroad\Domain\Attempt\Exception\InvalidTransitionException;
 use Payroad\Domain\Money\Currency;
 use Payroad\Domain\Money\Money;

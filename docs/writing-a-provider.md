@@ -61,8 +61,8 @@ and two serialization methods used by the persistence layer:
 
 namespace Payroad\Provider\Acme\Data;
 
-use Payroad\Domain\PaymentFlow\Card\CardAttemptData;
-use Payroad\Domain\PaymentFlow\Card\ThreeDSData;
+use Payroad\Domain\Channel\Card\CardAttemptData;
+use Payroad\Domain\Channel\Card\ThreeDSData;
 
 final class AcmeCardAttemptData implements CardAttemptData
 {
@@ -128,7 +128,7 @@ Same pattern, implementing the matching refund data interface:
 
 namespace Payroad\Provider\Acme\Data;
 
-use Payroad\Domain\PaymentFlow\Card\CardRefundData;
+use Payroad\Domain\Channel\Card\CardRefundData;
 
 final class AcmeCardRefundData implements CardRefundData
 {
@@ -173,8 +173,8 @@ use Payroad\Domain\Attempt\AttemptStatus;
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
-use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
-use Payroad\Domain\PaymentFlow\Card\CardRefund;
+use Payroad\Domain\Channel\Card\CardPaymentAttempt;
+use Payroad\Domain\Channel\Card\CardRefund;
 use Payroad\Domain\Refund\RefundId;
 use Payroad\Domain\Refund\RefundStatus;
 use Payroad\Port\Provider\Card\CapturableCardProviderInterface;

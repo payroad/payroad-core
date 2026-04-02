@@ -19,7 +19,7 @@ use Payroad\Domain\Payment\Payment;
 use Payroad\Domain\Payment\PaymentId;
 use Payroad\Domain\Payment\PaymentMetadata;
 use Payroad\Domain\Payment\PaymentStatus;
-use Payroad\Domain\PaymentFlow\Cash\CashPaymentAttempt;
+use Payroad\Domain\Channel\Cash\CashPaymentAttempt;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
 use Payroad\Port\Provider\Cash\CashAttemptContext;
 use Payroad\Port\Provider\Cash\CashProviderInterface;

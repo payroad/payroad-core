@@ -1,6 +1,6 @@
 <?php
 
-namespace Payroad\Domain\PaymentFlow\Crypto;
+namespace Payroad\Domain\Channel\Crypto;
 
 use DateTimeImmutable;
 use Payroad\Domain\Attempt\AttemptStatus;

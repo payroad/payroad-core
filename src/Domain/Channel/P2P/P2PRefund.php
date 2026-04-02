@@ -1,6 +1,6 @@
 <?php
 
-namespace Payroad\Domain\PaymentFlow\Card;
+namespace Payroad\Domain\Channel\P2P;
 
 use DateTimeImmutable;
 use Payroad\Domain\Attempt\PaymentAttemptId;
@@ -11,14 +11,14 @@ use Payroad\Domain\Refund\Event\RefundInitiated;
 use Payroad\Domain\Refund\Refund;
 use Payroad\Domain\Refund\RefundStatus;
 use Payroad\Port\Provider\RefundData;
-use Payroad\Port\Provider\Card\CardRefundData;
+use Payroad\Port\Provider\P2P\P2PRefundData;
 use Payroad\Domain\Refund\RefundId;
 use Payroad\Domain\Refund\RefundStateMachineInterface;
 
-final class CardRefund extends Refund
+final class P2PRefund extends Refund
 {
-    private CardRefundData        $data;
-    private CardRefundStateMachine $machine;
+    private P2PRefundData      $data;
+    private P2PRefundStateMachine $machine;
 
     public function __construct(
         RefundId           $id,
@@ -26,7 +26,7 @@ final class CardRefund extends Refund
         PaymentAttemptId   $originalAttemptId,
         string             $providerName,
         Money              $amount,
-        CardRefundData     $data,
+        P2PRefundData      $data,
         RefundStatus       $status            = RefundStatus::PENDING,
         string             $providerStatus    = 'pending',
         ?string            $providerReference = null,
@@ -34,7 +34,7 @@ final class CardRefund extends Refund
     ) {
         parent::__construct($id, $paymentId, $originalAttemptId, $providerName, $amount, $status, $providerStatus, $providerReference, $createdAt);
         $this->data    = $data;
-        $this->machine = new CardRefundStateMachine();
+        $this->machine = new P2PRefundStateMachine();
     }
 
     public static function create(
@@ -43,7 +43,7 @@ final class CardRefund extends Refund
         PaymentAttemptId $originalAttemptId,
         string           $providerName,
         Money            $amount,
-        CardRefundData   $data
+        P2PRefundData    $data
     ): self {
         $refund = new self($id, $paymentId, $originalAttemptId, $providerName, $amount, $data);
 
@@ -51,7 +51,7 @@ final class CardRefund extends Refund
             $refund->getId(),
             $paymentId,
             $originalAttemptId,
-            PaymentMethodType::CARD,
+            PaymentMethodType::P2P,
             $providerName,
             $amount,
         ));
@@ -61,7 +61,7 @@ final class CardRefund extends Refund
 
     public function getMethodType(): PaymentMethodType
     {
-        return PaymentMethodType::CARD;
+        return PaymentMethodType::P2P;
     }
 
     protected function stateMachine(): RefundStateMachineInterface
@@ -69,21 +69,21 @@ final class CardRefund extends Refund
         return $this->machine;
     }
 
-    public function getData(): CardRefundData
+    public function getData(): P2PRefundData
     {
         return $this->data;
     }
 
-    public function updateCardData(CardRefundData $data): void
+    public function updateP2PData(P2PRefundData $data): void
     {
         $this->data = $data;
     }
 
     public function updateSpecificData(RefundData $data): void
     {
-        if (!$data instanceof CardRefundData) {
-            throw new \InvalidArgumentException('CardRefund requires CardRefundData.');
+        if (!$data instanceof P2PRefundData) {
+            throw new \InvalidArgumentException('P2PRefund requires P2PRefundData.');
         }
-        $this->updateCardData($data);
+        $this->updateP2PData($data);
     }
 }

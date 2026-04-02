@@ -2,7 +2,7 @@
 
 namespace Tests\Stub;
 
-use Payroad\Domain\PaymentFlow\Crypto\CryptoAttemptData;
+use Payroad\Domain\Channel\Crypto\CryptoAttemptData;
 
 final class StubCryptoData implements CryptoAttemptData
 {

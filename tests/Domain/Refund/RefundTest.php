@@ -6,7 +6,7 @@ use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Money\Currency;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
-use Payroad\Domain\PaymentFlow\Card\CardRefund;
+use Payroad\Domain\Channel\Card\CardRefund;
 use Payroad\Domain\Refund\Event\RefundFailed;
 use Payroad\Domain\Refund\Event\RefundInitiated;
 use Payroad\Domain\Refund\Event\RefundSucceeded;

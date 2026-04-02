@@ -1,6 +1,6 @@
 <?php
 
-namespace Payroad\Domain\PaymentFlow\Card;
+namespace Payroad\Domain\Channel\Card;
 
 /**
  * Structured 3DS authentication data returned by the provider.

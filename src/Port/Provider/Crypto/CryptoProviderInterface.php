@@ -3,7 +3,7 @@
 namespace Payroad\Port\Provider\Crypto;
 
 use Payroad\Domain\Attempt\PaymentAttemptId;
-use Payroad\Domain\PaymentFlow\Crypto\CryptoPaymentAttempt;
+use Payroad\Domain\Channel\Crypto\CryptoPaymentAttempt;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
 use Payroad\Port\Provider\PaymentProviderInterface;

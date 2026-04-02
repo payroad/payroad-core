@@ -3,7 +3,7 @@
 namespace Payroad\Application\UseCase\Crypto;
 
 use Payroad\Application\UseCase\Shared\AttemptInitiationGuard;
-use Payroad\Domain\PaymentFlow\Crypto\CryptoPaymentAttempt;
+use Payroad\Domain\Channel\Crypto\CryptoPaymentAttempt;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
 use Payroad\Port\Provider\ProviderRegistryInterface;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;

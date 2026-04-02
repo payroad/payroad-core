@@ -225,7 +225,7 @@ use Payroad\Domain\Attempt\AttemptStatus;
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
-use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
+use Payroad\Domain\Channel\Card\CardPaymentAttempt;
 use Payroad\Port\Provider\Card\CardAttemptContext;
 use Payroad\Port\Provider\Card\CardProviderInterface;
 use Payroad\Port\Provider\Card\CaptureResult;

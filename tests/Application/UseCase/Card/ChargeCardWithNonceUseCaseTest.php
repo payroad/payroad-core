@@ -14,7 +14,7 @@ use Payroad\Domain\Payment\Payment;
 use Payroad\Domain\Payment\PaymentId;
 use Payroad\Domain\Payment\PaymentMetadata;
 use Payroad\Domain\Payment\PaymentStatus;
-use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
+use Payroad\Domain\Channel\Card\CardPaymentAttempt;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
 use Payroad\Port\Provider\Card\ChargeResult;
 use Payroad\Port\Provider\Card\TwoStepCardProviderInterface;

@@ -2,7 +2,7 @@
 
 namespace Tests\Stub;
 
-use Payroad\Domain\PaymentFlow\Cash\CashAttemptData;
+use Payroad\Domain\Channel\Cash\CashAttemptData;
 
 final class StubCashData implements CashAttemptData
 {

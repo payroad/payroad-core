@@ -4,8 +4,8 @@ namespace Payroad\Application\UseCase\Crypto;
 
 use Payroad\Application\Exception\AttemptNotFoundException;
 use Payroad\Application\UseCase\Shared\RefundInitiationGuard;
-use Payroad\Domain\PaymentFlow\Crypto\CryptoPaymentAttempt;
-use Payroad\Domain\PaymentFlow\Crypto\CryptoRefund;
+use Payroad\Domain\Channel\Crypto\CryptoPaymentAttempt;
+use Payroad\Domain\Channel\Crypto\CryptoRefund;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
 use Payroad\Port\Provider\Crypto\RefundableCryptoProviderInterface;
 use Payroad\Port\Provider\ProviderRegistryInterface;

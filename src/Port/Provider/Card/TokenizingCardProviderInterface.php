@@ -6,8 +6,8 @@ use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\CustomerId;
 use Payroad\Domain\Payment\PaymentId;
-use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
-use Payroad\Domain\PaymentFlow\Card\CardSavedPaymentMethod;
+use Payroad\Domain\Channel\Card\CardPaymentAttempt;
+use Payroad\Domain\Channel\Card\CardSavedPaymentMethod;
 use Payroad\Domain\SavedPaymentMethod\SavedPaymentMethodId;
 
 /**

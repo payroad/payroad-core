@@ -1,6 +1,6 @@
 <?php
 
-namespace Payroad\Domain\PaymentFlow\Cash;
+namespace Payroad\Domain\Channel\Card;
 
 use DateTimeImmutable;
 use Payroad\Domain\Attempt\PaymentAttemptId;
@@ -11,14 +11,14 @@ use Payroad\Domain\Refund\Event\RefundInitiated;
 use Payroad\Domain\Refund\Refund;
 use Payroad\Domain\Refund\RefundStatus;
 use Payroad\Port\Provider\RefundData;
-use Payroad\Port\Provider\Cash\CashRefundData;
+use Payroad\Port\Provider\Card\CardRefundData;
 use Payroad\Domain\Refund\RefundId;
 use Payroad\Domain\Refund\RefundStateMachineInterface;
 
-final class CashRefund extends Refund
+final class CardRefund extends Refund
 {
-    private CashRefundData        $data;
-    private CashRefundStateMachine $machine;
+    private CardRefundData        $data;
+    private CardRefundStateMachine $machine;
 
     public function __construct(
         RefundId           $id,
@@ -26,7 +26,7 @@ final class CashRefund extends Refund
         PaymentAttemptId   $originalAttemptId,
         string             $providerName,
         Money              $amount,
-        CashRefundData     $data,
+        CardRefundData     $data,
         RefundStatus       $status            = RefundStatus::PENDING,
         string             $providerStatus    = 'pending',
         ?string            $providerReference = null,
@@ -34,7 +34,7 @@ final class CashRefund extends Refund
     ) {
         parent::__construct($id, $paymentId, $originalAttemptId, $providerName, $amount, $status, $providerStatus, $providerReference, $createdAt);
         $this->data    = $data;
-        $this->machine = new CashRefundStateMachine();
+        $this->machine = new CardRefundStateMachine();
     }
 
     public static function create(
@@ -43,7 +43,7 @@ final class CashRefund extends Refund
         PaymentAttemptId $originalAttemptId,
         string           $providerName,
         Money            $amount,
-        CashRefundData   $data
+        CardRefundData   $data
     ): self {
         $refund = new self($id, $paymentId, $originalAttemptId, $providerName, $amount, $data);
 
@@ -51,7 +51,7 @@ final class CashRefund extends Refund
             $refund->getId(),
             $paymentId,
             $originalAttemptId,
-            PaymentMethodType::CASH,
+            PaymentMethodType::CARD,
             $providerName,
             $amount,
         ));
@@ -61,7 +61,7 @@ final class CashRefund extends Refund
 
     public function getMethodType(): PaymentMethodType
     {
-        return PaymentMethodType::CASH;
+        return PaymentMethodType::CARD;
     }
 
     protected function stateMachine(): RefundStateMachineInterface
@@ -69,21 +69,21 @@ final class CashRefund extends Refund
         return $this->machine;
     }
 
-    public function getData(): CashRefundData
+    public function getData(): CardRefundData
     {
         return $this->data;
     }
 
-    public function updateCashData(CashRefundData $data): void
+    public function updateCardData(CardRefundData $data): void
     {
         $this->data = $data;
     }
 
     public function updateSpecificData(RefundData $data): void
     {
-        if (!$data instanceof CashRefundData) {
-            throw new \InvalidArgumentException('CashRefund requires CashRefundData.');
+        if (!$data instanceof CardRefundData) {
+            throw new \InvalidArgumentException('CardRefund requires CardRefundData.');
         }
-        $this->updateCashData($data);
+        $this->updateCardData($data);
     }
 }

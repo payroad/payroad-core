@@ -4,8 +4,8 @@ namespace Payroad\Application\UseCase\Card;
 
 use Payroad\Application\Exception\AttemptNotFoundException;
 use Payroad\Application\UseCase\Shared\RefundInitiationGuard;
-use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
-use Payroad\Domain\PaymentFlow\Card\CardRefund;
+use Payroad\Domain\Channel\Card\CardPaymentAttempt;
+use Payroad\Domain\Channel\Card\CardRefund;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
 use Payroad\Port\Provider\ProviderRegistryInterface;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;

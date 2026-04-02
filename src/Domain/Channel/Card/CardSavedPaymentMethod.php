@@ -1,6 +1,6 @@
 <?php
 
-namespace Payroad\Domain\PaymentFlow\Card;
+namespace Payroad\Domain\Channel\Card;
 
 use DateTimeImmutable;
 use Payroad\Domain\PaymentMethodType;

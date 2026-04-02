@@ -4,7 +4,7 @@ namespace Tests\Domain\Attempt;
 
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStatus;
-use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
+use Payroad\Domain\Channel\Card\CardPaymentAttempt;
 use Payroad\Domain\Attempt\PaymentAttempt;
 use Payroad\Domain\Attempt\Event\AttemptCanceled;
 use Payroad\Domain\Attempt\Event\AttemptFailed;

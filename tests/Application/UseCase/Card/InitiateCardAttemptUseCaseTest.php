@@ -12,7 +12,7 @@ use Payroad\Application\UseCase\Card\InitiateCardAttemptUseCase;
 use Payroad\Application\UseCase\Shared\AttemptInitiationGuard;
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStatus;
-use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
+use Payroad\Domain\Channel\Card\CardPaymentAttempt;
 use Payroad\Domain\DomainEvent;
 use Payroad\Domain\Money\Currency;
 use Payroad\Domain\Money\Money;

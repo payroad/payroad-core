@@ -5,7 +5,7 @@ namespace Payroad\Application\UseCase\Card;
 use Payroad\Application\Exception\AttemptNotFoundException;
 use Payroad\Application\Exception\PaymentNotFoundException;
 use Payroad\Domain\Attempt\AttemptStatus;
-use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
+use Payroad\Domain\Channel\Card\CardPaymentAttempt;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
 use Payroad\Port\Provider\Card\TwoStepCardProviderInterface;
 use Payroad\Port\Provider\ProviderRegistryInterface;

@@ -3,8 +3,8 @@
 namespace Payroad\Port\Provider\Cash;
 
 use Payroad\Domain\Attempt\PaymentAttemptId;
-use Payroad\Domain\PaymentFlow\Cash\CashPaymentAttempt;
-use Payroad\Domain\PaymentFlow\Cash\CashRefund;
+use Payroad\Domain\Channel\Cash\CashPaymentAttempt;
+use Payroad\Domain\Channel\Cash\CashRefund;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
 use Payroad\Domain\Refund\RefundId;

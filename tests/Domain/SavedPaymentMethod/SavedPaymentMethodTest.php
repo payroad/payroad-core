@@ -4,7 +4,7 @@ namespace Tests\Domain\SavedPaymentMethod;
 
 use Payroad\Domain\PaymentMethodType;
 use Payroad\Domain\Payment\CustomerId;
-use Payroad\Domain\PaymentFlow\Card\CardSavedPaymentMethod;
+use Payroad\Domain\Channel\Card\CardSavedPaymentMethod;
 use Payroad\Domain\SavedPaymentMethod\Event\PaymentMethodRemoved;
 use Payroad\Domain\SavedPaymentMethod\Event\PaymentMethodSaved;
 use Payroad\Domain\SavedPaymentMethod\SavedPaymentMethodId;

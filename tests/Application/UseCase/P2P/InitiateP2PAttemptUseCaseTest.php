@@ -19,7 +19,7 @@ use Payroad\Domain\Payment\Payment;
 use Payroad\Domain\Payment\PaymentId;
 use Payroad\Domain\Payment\PaymentMetadata;
 use Payroad\Domain\Payment\PaymentStatus;
-use Payroad\Domain\PaymentFlow\P2P\P2PPaymentAttempt;
+use Payroad\Domain\Channel\P2P\P2PPaymentAttempt;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
 use Payroad\Port\Provider\P2P\P2PAttemptContext;
 use Payroad\Port\Provider\P2P\P2PProviderInterface;

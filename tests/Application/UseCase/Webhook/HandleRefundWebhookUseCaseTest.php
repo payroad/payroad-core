@@ -13,7 +13,7 @@ use Payroad\Domain\Payment\Payment;
 use Payroad\Domain\Payment\PaymentId;
 use Payroad\Domain\Payment\PaymentMetadata;
 use Payroad\Domain\Payment\PaymentStatus;
-use Payroad\Domain\PaymentFlow\Card\CardRefund;
+use Payroad\Domain\Channel\Card\CardRefund;
 use Payroad\Domain\Refund\RefundId;
 use Payroad\Domain\Refund\RefundStatus;
 use Payroad\Port\Event\DomainEventDispatcherInterface;

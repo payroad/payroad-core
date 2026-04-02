@@ -7,7 +7,7 @@ use Payroad\Application\UseCase\Card\CaptureCardAttemptCommand;
 use Payroad\Application\UseCase\Card\CaptureCardAttemptUseCase;
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Attempt\AttemptStatus;
-use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
+use Payroad\Domain\Channel\Card\CardPaymentAttempt;
 use Payroad\Domain\Money\Currency;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\CustomerId;

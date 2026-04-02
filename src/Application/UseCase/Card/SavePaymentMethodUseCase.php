@@ -3,7 +3,7 @@
 namespace Payroad\Application\UseCase\Card;
 
 use Payroad\Application\Exception\AttemptNotFoundException;
-use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
+use Payroad\Domain\Channel\Card\CardPaymentAttempt;
 use Payroad\Domain\SavedPaymentMethod\SavedPaymentMethod;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
 use Payroad\Port\Provider\Card\TokenizingCardProviderInterface;

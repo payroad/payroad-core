@@ -5,8 +5,8 @@ namespace Payroad\Port\Provider\Card;
 use Payroad\Domain\Attempt\PaymentAttemptId;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
-use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
-use Payroad\Domain\PaymentFlow\Card\CardRefund;
+use Payroad\Domain\Channel\Card\CardPaymentAttempt;
+use Payroad\Domain\Channel\Card\CardRefund;
 use Payroad\Domain\Refund\RefundId;
 use Payroad\Port\Provider\PaymentProviderInterface;
 

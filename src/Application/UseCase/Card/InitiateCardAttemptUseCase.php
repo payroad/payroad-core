@@ -3,7 +3,7 @@
 namespace Payroad\Application\UseCase\Card;
 
 use Payroad\Application\UseCase\Shared\AttemptInitiationGuard;
-use Payroad\Domain\PaymentFlow\Card\CardPaymentAttempt;
+use Payroad\Domain\Channel\Card\CardPaymentAttempt;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
 use Payroad\Port\Provider\ProviderRegistryInterface;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;

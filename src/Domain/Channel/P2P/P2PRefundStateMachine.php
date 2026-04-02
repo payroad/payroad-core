@@ -1,21 +1,22 @@
 <?php
 
-namespace Payroad\Domain\PaymentFlow\Card;
+namespace Payroad\Domain\Channel\P2P;
 
 use Payroad\Domain\Refund\RefundStateMachineInterface;
 use Payroad\Domain\Refund\RefundStatus;
 
 /**
- * Refund state machine for card payments.
+ * Refund state machine for P2P payments.
  *
  * PENDING ──► PROCESSING ──► SUCCEEDED
  *         └──► SUCCEEDED    └──► FAILED
  *         └──► FAILED
  *
- * Card refunds may process asynchronously via the card network (PENDING → PROCESSING → SUCCEEDED),
- * or synchronously for some providers (PENDING → SUCCEEDED).
+ * P2P refunds follow the same async flow as cards: the provider may
+ * confirm synchronously (PENDING → SUCCEEDED) or schedule a bank transfer
+ * that moves through PROCESSING first.
  */
-final class CardRefundStateMachine implements RefundStateMachineInterface
+final class P2PRefundStateMachine implements RefundStateMachineInterface
 {
     public function canTransition(RefundStatus $from, RefundStatus $to): bool
     {

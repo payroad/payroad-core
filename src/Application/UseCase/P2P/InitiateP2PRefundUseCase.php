@@ -4,8 +4,8 @@ namespace Payroad\Application\UseCase\P2P;
 
 use Payroad\Application\Exception\AttemptNotFoundException;
 use Payroad\Application\UseCase\Shared\RefundInitiationGuard;
-use Payroad\Domain\PaymentFlow\P2P\P2PPaymentAttempt;
-use Payroad\Domain\PaymentFlow\P2P\P2PRefund;
+use Payroad\Domain\Channel\P2P\P2PPaymentAttempt;
+use Payroad\Domain\Channel\P2P\P2PRefund;
 use Payroad\Port\Event\DomainEventDispatcherInterface;
 use Payroad\Port\Provider\ProviderRegistryInterface;
 use Payroad\Port\Repository\PaymentAttemptRepositoryInterface;

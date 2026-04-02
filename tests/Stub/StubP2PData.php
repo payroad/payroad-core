@@ -2,7 +2,7 @@
 
 namespace Tests\Stub;
 
-use Payroad\Domain\PaymentFlow\P2P\P2PAttemptData;
+use Payroad\Domain\Channel\P2P\P2PAttemptData;
 
 final class StubP2PData implements P2PAttemptData
 {

@@ -3,8 +3,8 @@
 namespace Payroad\Port\Provider\P2P;
 
 use Payroad\Domain\Attempt\PaymentAttemptId;
-use Payroad\Domain\PaymentFlow\P2P\P2PPaymentAttempt;
-use Payroad\Domain\PaymentFlow\P2P\P2PRefund;
+use Payroad\Domain\Channel\P2P\P2PPaymentAttempt;
+use Payroad\Domain\Channel\P2P\P2PRefund;
 use Payroad\Domain\Money\Money;
 use Payroad\Domain\Payment\PaymentId;
 use Payroad\Domain\Refund\RefundId;

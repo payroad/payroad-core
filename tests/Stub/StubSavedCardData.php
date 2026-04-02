@@ -2,7 +2,7 @@
 
 namespace Tests\Stub;
 
-use Payroad\Domain\PaymentFlow\Card\CardSavedPaymentMethodData;
+use Payroad\Domain\Channel\Card\CardSavedPaymentMethodData;
 
 final class StubSavedCardData implements CardSavedPaymentMethodData
 {

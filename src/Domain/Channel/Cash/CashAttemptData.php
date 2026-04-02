@@ -1,6 +1,6 @@
 <?php
 
-namespace Payroad\Domain\PaymentFlow\Cash;
+namespace Payroad\Domain\Channel\Cash;
 
 use Payroad\Domain\Attempt\AttemptData;
 
