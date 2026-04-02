@@ -169,15 +169,25 @@ final class ChargeCardWithNonceUseCaseTest extends TestCase
 
     public function testExecuteThrowsWhenProviderDoesNotSupportNonce(): void
     {
-        $payment  = $this->makePayment();
-        $attempt  = $this->makePendingAttempt($payment);
+        $payment    = $this->makePayment();
+        $attempt    = $this->makePendingAttempt($payment);
         $nonTwoStep = $this->createMock(\Payroad\Port\Provider\Card\CardProviderInterface::class);
 
+        // Use a fresh providers mock to avoid setUp's willReturn($twoStepProvider) taking precedence.
+        $providers = $this->createMock(ProviderRegistryInterface::class);
+        $providers->method('forCard')->willReturn($nonTwoStep);
+
         $this->attempts->method('findById')->willReturn($attempt);
-        $this->providers->method('forCard')->willReturn($nonTwoStep);
+
+        $useCase = new ChargeCardWithNonceUseCase(
+            $this->attempts,
+            $this->payments,
+            $providers,
+            $this->dispatcher,
+        );
 
         $this->expectException(\DomainException::class);
-        $this->useCase->execute($this->makeCommand($attempt));
+        $useCase->execute($this->makeCommand($attempt));
     }
 
     public function testExecuteSavesAttemptAfterCharge(): void
