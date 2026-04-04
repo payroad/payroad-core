@@ -57,7 +57,6 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
             });
 
         $this->providers->method('forCard')->willReturn($this->cardProvider);
-        $this->attempts->method('findById')->willReturn(null);
 
         $this->useCase = new InitiateCardAttemptUseCase(
             new AttemptInitiationGuard($this->payments, $this->attempts),

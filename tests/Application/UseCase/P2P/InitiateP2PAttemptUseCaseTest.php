@@ -55,7 +55,6 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
             );
 
         $this->providers->method('forP2P')->willReturn($this->p2pProvider);
-        $this->attempts->method('findById')->willReturn(null);
 
         $this->useCase = new InitiateP2PAttemptUseCase(
             new AttemptInitiationGuard($this->payments, $this->attempts),

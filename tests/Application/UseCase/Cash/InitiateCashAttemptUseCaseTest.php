@@ -55,7 +55,6 @@ final class InitiateCashAttemptUseCaseTest extends TestCase
             );
 
         $this->providers->method('forCash')->willReturn($this->cashProvider);
-        $this->attempts->method('findById')->willReturn(null);
 
         $this->useCase = new InitiateCashAttemptUseCase(
             new AttemptInitiationGuard($this->payments, $this->attempts),

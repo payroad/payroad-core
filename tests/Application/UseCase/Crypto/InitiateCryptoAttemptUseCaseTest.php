@@ -57,7 +57,6 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
             );
 
         $this->providers->method('forCrypto')->willReturn($this->cryptoProvider);
-        $this->attempts->method('findById')->willReturn(null);
 
         $this->useCase = new InitiateCryptoAttemptUseCase(
             new AttemptInitiationGuard($this->payments, $this->attempts),

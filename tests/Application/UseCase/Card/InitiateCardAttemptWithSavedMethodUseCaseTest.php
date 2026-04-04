@@ -70,7 +70,6 @@ final class InitiateCardAttemptWithSavedMethodUseCaseTest extends TestCase
             );
 
         $this->providers->method('forCard')->willReturn($this->cardProvider);
-        $this->attempts->method('findById')->willReturn(null);
 
         $this->useCase = new InitiateCardAttemptWithSavedMethodUseCase(
             new AttemptInitiationGuard($this->payments, $this->attempts),
