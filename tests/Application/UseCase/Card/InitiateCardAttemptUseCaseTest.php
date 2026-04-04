@@ -57,7 +57,7 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
             });
 
         $this->providers->method('forCard')->willReturn($this->cardProvider);
-        $this->attempts->method('nextId')->willReturn(PaymentAttemptId::generate());
+        $this->attempts->method('findById')->willReturn(null);
 
         $this->useCase = new InitiateCardAttemptUseCase(
             new AttemptInitiationGuard($this->payments, $this->attempts),
@@ -84,6 +84,7 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
     private function makeCommand(Payment $payment): InitiateCardAttemptCommand
     {
         return new InitiateCardAttemptCommand(
+            PaymentAttemptId::generate(),
             $payment->getId(),
             'stub',
             new CardAttemptContext('1.2.3.4', 'Mozilla/5.0'),
@@ -103,9 +104,10 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
 
     public function testExecuteCallsProviderWithContext(): void
     {
-        $payment = $this->makePayment();
-        $context = new CardAttemptContext('1.2.3.4', 'Mozilla/5.0', 'US');
-        $command = new InitiateCardAttemptCommand($payment->getId(), 'stub', $context);
+        $payment   = $this->makePayment();
+        $attemptId = PaymentAttemptId::generate();
+        $context   = new CardAttemptContext('1.2.3.4', 'Mozilla/5.0', 'US');
+        $command   = new InitiateCardAttemptCommand($attemptId, $payment->getId(), 'stub', $context);
 
         $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
@@ -114,7 +116,7 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
             ->expects($this->once())
             ->method('initiateCardAttempt')
             ->with(
-                $this->isInstanceOf(PaymentAttemptId::class),
+                $this->equalTo($attemptId),
                 $this->isInstanceOf(PaymentId::class),
                 'stub',
                 $this->isInstanceOf(Money::class),
@@ -174,7 +176,7 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
 
         $this->expectException(PaymentNotFoundException::class);
         $this->useCase->execute(new InitiateCardAttemptCommand(
-            PaymentId::generate(), 'stub', new CardAttemptContext('1.2.3.4', 'ua')
+            PaymentAttemptId::generate(), PaymentId::generate(), 'stub', new CardAttemptContext('1.2.3.4', 'ua')
         ));
     }
 
@@ -224,5 +226,22 @@ final class InitiateCardAttemptUseCaseTest extends TestCase
         $result = $this->useCase->execute($this->makeCommand($payment));
 
         $this->assertInstanceOf(CardPaymentAttempt::class, $result);
+    }
+
+    public function testReturnsExistingAttemptOnIdempotentRetry(): void
+    {
+        $payment   = $this->makePayment();
+        $attemptId = PaymentAttemptId::generate();
+        $existing  = CardPaymentAttempt::create($attemptId, $payment->getId(), 'stub', Money::ofMinor(1000, new Currency('USD', 2)), new StubSpecificData());
+        $existing->setProviderReference('pi_existing');
+
+        $this->attempts->method('findById')->willReturn($existing);
+
+        $this->cardProvider->expects($this->never())->method('initiateCardAttempt');
+
+        $command = new InitiateCardAttemptCommand($attemptId, $payment->getId(), 'stub', new CardAttemptContext('1.2.3.4', 'ua'));
+        $result  = $this->useCase->execute($command);
+
+        $this->assertSame($existing, $result);
     }
 }

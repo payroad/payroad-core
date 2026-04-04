@@ -25,6 +25,11 @@ final class InitiateCardAttemptWithSavedMethodUseCase
 
     public function execute(InitiateCardAttemptWithSavedMethodCommand $command): CardPaymentAttempt
     {
+        $existing = $this->attempts->findById($command->attemptId);
+        if ($existing !== null) {
+            return CardPaymentAttempt::fromAttempt($existing);
+        }
+
         $payment = $this->guard->loadPayment($command->paymentId);
         $this->guard->guardNoActiveAttempt($command->paymentId);
 
@@ -45,9 +50,8 @@ final class InitiateCardAttemptWithSavedMethodUseCase
             );
         }
 
-        $id      = $this->attempts->nextId();
         $attempt = $provider->initiateAttemptWithSavedMethod(
-                $id,
+                $command->attemptId,
                 $payment->getId(),
                 $command->providerName,
                 $payment->getAmount(),

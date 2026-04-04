@@ -21,14 +21,18 @@ final class InitiateP2PAttemptUseCase
 
     public function execute(InitiateP2PAttemptCommand $command): P2PPaymentAttempt
     {
+        $existing = $this->attempts->findById($command->attemptId);
+        if ($existing !== null) {
+            return P2PPaymentAttempt::fromAttempt($existing);
+        }
+
         $payment = $this->guard->loadPayment($command->paymentId);
         $this->guard->guardNoActiveAttempt($command->paymentId);
 
-        $id      = $this->attempts->nextId();
         $attempt = $this->providers
             ->forP2P($command->providerName)
             ->initiateP2PAttempt(
-                $id,
+                $command->attemptId,
                 $payment->getId(),
                 $command->providerName,
                 $payment->getAmount(),

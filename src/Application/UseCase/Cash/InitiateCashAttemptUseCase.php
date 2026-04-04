@@ -21,14 +21,18 @@ final class InitiateCashAttemptUseCase
 
     public function execute(InitiateCashAttemptCommand $command): CashPaymentAttempt
     {
+        $existing = $this->attempts->findById($command->attemptId);
+        if ($existing !== null) {
+            return CashPaymentAttempt::fromAttempt($existing);
+        }
+
         $payment = $this->guard->loadPayment($command->paymentId);
         $this->guard->guardNoActiveAttempt($command->paymentId);
 
-        $id      = $this->attempts->nextId();
         $attempt = $this->providers
             ->forCash($command->providerName)
             ->initiateCashAttempt(
-                $id,
+                $command->attemptId,
                 $payment->getId(),
                 $command->providerName,
                 $payment->getAmount(),

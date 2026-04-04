@@ -57,7 +57,7 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
             );
 
         $this->providers->method('forCrypto')->willReturn($this->cryptoProvider);
-        $this->attempts->method('nextId')->willReturn(PaymentAttemptId::generate());
+        $this->attempts->method('findById')->willReturn(null);
 
         $this->useCase = new InitiateCryptoAttemptUseCase(
             new AttemptInitiationGuard($this->payments, $this->attempts),
@@ -84,6 +84,7 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
     private function makeCommand(Payment $payment): InitiateCryptoAttemptCommand
     {
         return new InitiateCryptoAttemptCommand(
+            PaymentAttemptId::generate(),
             $payment->getId(),
             'stub',
             new CryptoAttemptContext('trc20'),
@@ -103,9 +104,10 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
 
     public function testExecuteCallsProviderWithContext(): void
     {
-        $payment = $this->makePayment();
-        $context = new CryptoAttemptContext('erc20', 'memo-123');
-        $command = new InitiateCryptoAttemptCommand($payment->getId(), 'stub', $context);
+        $payment   = $this->makePayment();
+        $attemptId = PaymentAttemptId::generate();
+        $context   = new CryptoAttemptContext('erc20', 'memo-123');
+        $command   = new InitiateCryptoAttemptCommand($attemptId, $payment->getId(), 'stub', $context);
 
         $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
@@ -114,7 +116,7 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
             ->expects($this->once())
             ->method('initiateCryptoAttempt')
             ->with(
-                $this->isInstanceOf(PaymentAttemptId::class),
+                $this->equalTo($attemptId),
                 $this->isInstanceOf(PaymentId::class),
                 'stub',
                 $this->isInstanceOf(Money::class),
@@ -160,7 +162,7 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
         $this->expectException(PaymentNotFoundException::class);
 
         $this->useCase->execute(new InitiateCryptoAttemptCommand(
-            PaymentId::generate(), 'stub', new CryptoAttemptContext('erc20')
+            PaymentAttemptId::generate(), PaymentId::generate(), 'stub', new CryptoAttemptContext('erc20')
         ));
     }
 
@@ -197,5 +199,21 @@ final class InitiateCryptoAttemptUseCaseTest extends TestCase
         $result = $this->useCase->execute($this->makeCommand($payment));
 
         $this->assertInstanceOf(CryptoPaymentAttempt::class, $result);
+    }
+
+    public function testReturnsExistingAttemptOnIdempotentRetry(): void
+    {
+        $payment   = $this->makePayment();
+        $attemptId = PaymentAttemptId::generate();
+        $existing  = CryptoPaymentAttempt::create($attemptId, $payment->getId(), 'stub', Money::ofMinor(5000, new Currency('USDT', 6)), new StubCryptoData());
+
+        $this->attempts->method('findById')->willReturn($existing);
+
+        $this->cryptoProvider->expects($this->never())->method('initiateCryptoAttempt');
+
+        $command = new InitiateCryptoAttemptCommand($attemptId, $payment->getId(), 'stub', new CryptoAttemptContext('trc20'));
+        $result  = $this->useCase->execute($command);
+
+        $this->assertSame($existing, $result);
     }
 }

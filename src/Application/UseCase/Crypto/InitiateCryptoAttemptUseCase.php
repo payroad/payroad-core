@@ -21,14 +21,18 @@ final class InitiateCryptoAttemptUseCase
 
     public function execute(InitiateCryptoAttemptCommand $command): CryptoPaymentAttempt
     {
+        $existing = $this->attempts->findById($command->attemptId);
+        if ($existing !== null) {
+            return CryptoPaymentAttempt::fromAttempt($existing);
+        }
+
         $payment = $this->guard->loadPayment($command->paymentId);
         $this->guard->guardNoActiveAttempt($command->paymentId);
 
-        $id      = $this->attempts->nextId();
         $attempt = $this->providers
             ->forCrypto($command->providerName)
             ->initiateCryptoAttempt(
-                $id,
+                $command->attemptId,
                 $payment->getId(),
                 $command->providerName,
                 $payment->getAmount(),

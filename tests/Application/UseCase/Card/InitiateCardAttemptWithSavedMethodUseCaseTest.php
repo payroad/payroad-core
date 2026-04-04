@@ -70,7 +70,7 @@ final class InitiateCardAttemptWithSavedMethodUseCaseTest extends TestCase
             );
 
         $this->providers->method('forCard')->willReturn($this->cardProvider);
-        $this->attempts->method('nextId')->willReturn(PaymentAttemptId::generate());
+        $this->attempts->method('findById')->willReturn(null);
 
         $this->useCase = new InitiateCardAttemptWithSavedMethodUseCase(
             new AttemptInitiationGuard($this->payments, $this->attempts),
@@ -97,6 +97,7 @@ final class InitiateCardAttemptWithSavedMethodUseCaseTest extends TestCase
     private function makeCommand(Payment $payment): InitiateCardAttemptWithSavedMethodCommand
     {
         return new InitiateCardAttemptWithSavedMethodCommand(
+            PaymentAttemptId::generate(),
             $payment->getId(),
             'stub',
             $this->savedMethod->getId(),
@@ -117,7 +118,10 @@ final class InitiateCardAttemptWithSavedMethodUseCaseTest extends TestCase
 
     public function testExecutePassesProviderTokenToProvider(): void
     {
-        $payment = $this->makePayment();
+        $payment   = $this->makePayment();
+        $attemptId = PaymentAttemptId::generate();
+        $command   = new InitiateCardAttemptWithSavedMethodCommand($attemptId, $payment->getId(), 'stub', $this->savedMethod->getId());
+
         $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->savedMethods->method('findById')->willReturn($this->savedMethod);
         $this->payments->method('findById')->willReturn($payment);
@@ -126,7 +130,7 @@ final class InitiateCardAttemptWithSavedMethodUseCaseTest extends TestCase
             ->expects($this->once())
             ->method('initiateAttemptWithSavedMethod')
             ->with(
-                $this->isInstanceOf(PaymentAttemptId::class),
+                $this->equalTo($attemptId),
                 $this->isInstanceOf(PaymentId::class),
                 'stub',
                 $this->isInstanceOf(Money::class),
@@ -137,7 +141,7 @@ final class InitiateCardAttemptWithSavedMethodUseCaseTest extends TestCase
                     CardPaymentAttempt::create($id, $paymentId, 'stub', $amount, new StubSpecificData())
             );
 
-        $this->useCase->execute($this->makeCommand($payment));
+        $this->useCase->execute($command);
     }
 
     public function testExecuteMarksPaymentAsProcessing(): void
@@ -174,7 +178,7 @@ final class InitiateCardAttemptWithSavedMethodUseCaseTest extends TestCase
         $this->expectException(PaymentNotFoundException::class);
 
         $this->useCase->execute(new InitiateCardAttemptWithSavedMethodCommand(
-            PaymentId::generate(), 'stub', SavedPaymentMethodId::generate()
+            PaymentAttemptId::generate(), PaymentId::generate(), 'stub', SavedPaymentMethodId::generate()
         ));
     }
 
@@ -209,7 +213,7 @@ final class InitiateCardAttemptWithSavedMethodUseCaseTest extends TestCase
         $this->expectException(DomainException::class);
 
         $this->useCase->execute(new InitiateCardAttemptWithSavedMethodCommand(
-            $payment->getId(), 'stub', $expiredMethod->getId()
+            PaymentAttemptId::generate(), $payment->getId(), 'stub', $expiredMethod->getId()
         ));
     }
 
@@ -224,5 +228,22 @@ final class InitiateCardAttemptWithSavedMethodUseCaseTest extends TestCase
 
         $this->expectException(ActiveAttemptExistsException::class);
         $this->useCase->execute($this->makeCommand($payment));
+    }
+
+    public function testReturnsExistingAttemptOnIdempotentRetry(): void
+    {
+        $payment   = $this->makePayment();
+        $attemptId = PaymentAttemptId::generate();
+        $existing  = CardPaymentAttempt::create($attemptId, $payment->getId(), 'stub', Money::ofMinor(1000, new Currency('USD', 2)), new StubSpecificData());
+        $existing->setProviderReference('pi_existing');
+
+        $this->attempts->method('findById')->willReturn($existing);
+
+        $this->cardProvider->expects($this->never())->method('initiateAttemptWithSavedMethod');
+
+        $command = new InitiateCardAttemptWithSavedMethodCommand($attemptId, $payment->getId(), 'stub', $this->savedMethod->getId());
+        $result  = $this->useCase->execute($command);
+
+        $this->assertSame($existing, $result);
     }
 }

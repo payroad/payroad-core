@@ -55,7 +55,7 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
             );
 
         $this->providers->method('forP2P')->willReturn($this->p2pProvider);
-        $this->attempts->method('nextId')->willReturn(PaymentAttemptId::generate());
+        $this->attempts->method('findById')->willReturn(null);
 
         $this->useCase = new InitiateP2PAttemptUseCase(
             new AttemptInitiationGuard($this->payments, $this->attempts),
@@ -82,6 +82,7 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
     private function makeCommand(Payment $payment): InitiateP2PAttemptCommand
     {
         return new InitiateP2PAttemptCommand(
+            PaymentAttemptId::generate(),
             $payment->getId(),
             'stub',
             new P2PAttemptContext('John Doe'),
@@ -101,9 +102,10 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
 
     public function testExecuteCallsProviderWithContext(): void
     {
-        $payment = $this->makePayment();
-        $context = new P2PAttemptContext('Jane Smith', 'DEUTDEDB');
-        $command = new InitiateP2PAttemptCommand($payment->getId(), 'stub', $context);
+        $payment   = $this->makePayment();
+        $attemptId = PaymentAttemptId::generate();
+        $context   = new P2PAttemptContext('Jane Smith', 'DEUTDEDB');
+        $command   = new InitiateP2PAttemptCommand($attemptId, $payment->getId(), 'stub', $context);
 
         $this->attempts->method('findByPaymentId')->willReturn([]);
         $this->payments->method('findById')->willReturn($payment);
@@ -112,7 +114,7 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
             ->expects($this->once())
             ->method('initiateP2PAttempt')
             ->with(
-                $this->isInstanceOf(PaymentAttemptId::class),
+                $this->equalTo($attemptId),
                 $this->isInstanceOf(PaymentId::class),
                 'stub',
                 $this->isInstanceOf(Money::class),
@@ -158,7 +160,7 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
         $this->expectException(PaymentNotFoundException::class);
 
         $this->useCase->execute(new InitiateP2PAttemptCommand(
-            PaymentId::generate(), 'stub', new P2PAttemptContext('Unknown')
+            PaymentAttemptId::generate(), PaymentId::generate(), 'stub', new P2PAttemptContext('Unknown')
         ));
     }
 
@@ -195,5 +197,21 @@ final class InitiateP2PAttemptUseCaseTest extends TestCase
         $result = $this->useCase->execute($this->makeCommand($payment));
 
         $this->assertInstanceOf(P2PPaymentAttempt::class, $result);
+    }
+
+    public function testReturnsExistingAttemptOnIdempotentRetry(): void
+    {
+        $payment   = $this->makePayment();
+        $attemptId = PaymentAttemptId::generate();
+        $existing  = P2PPaymentAttempt::create($attemptId, $payment->getId(), 'stub', Money::ofMinor(20000, new Currency('USD', 2)), new StubP2PData());
+
+        $this->attempts->method('findById')->willReturn($existing);
+
+        $this->p2pProvider->expects($this->never())->method('initiateP2PAttempt');
+
+        $command = new InitiateP2PAttemptCommand($attemptId, $payment->getId(), 'stub', new P2PAttemptContext('John Doe'));
+        $result  = $this->useCase->execute($command);
+
+        $this->assertSame($existing, $result);
     }
 }
